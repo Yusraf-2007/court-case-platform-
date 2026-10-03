@@ -11,12 +11,24 @@
 --
 -- To remove the synthetic data:  DELETE FROM hearings WHERE is_synthetic;
 -- ###########################################################################
---
+
+BEGIN;
+
+-- ---------------------------------------------------------------------------
+-- SEED ANCHOR DATE
+-- Seeds must be reproducible: running this migration on any day, on any
+-- branch, must produce identical rows. So "today" is this fixed constant,
+-- never CURRENT_DATE. It is the date the dataset was frozen. Change it only
+-- deliberately, and regenerate the synthetic hearings when you do.
+-- SET LOCAL scopes it to this transaction.
+-- ---------------------------------------------------------------------------
+SET LOCAL app.seed_anchor_date = '2026-10-03';
+
 -- How hearings are generated (Part 2), per case with a stated count and a
 -- known filed_on:
 --   - dates: spread evenly from filed_on to disposed_on (disposed cases,
 --     whose last hearing falls on disposed_on with outcome 'disposed') or to
---     CURRENT_DATE (every other case, all hearings strictly before it).
+--     the seed anchor date (every other case, all hearings strictly before it).
 --   - adjourned: exactly times_adjourned of the non-final hearings, spaced
 --     evenly. If times_adjourned is not stated, none are adjourned.
 --   - adjournment_reason: taken from the case's own stated breakdown, in
@@ -32,13 +44,12 @@
 --      absent" is not a count and is not stored.
 --   3. Cases 39, 40, 44, 47, 48, 49, 50, 53 have no stated counts and no
 --      filed_on, so they get no hearings.
---   4. Case 7 reopened on remand, so its hearings run to CURRENT_DATE across
+--   4. Case 7 reopened on remand, so its hearings run to the anchor date across
 --      its 30-09-2025 acquittal. Case 51's hearings ignore its court transfer.
 --   5. Stated orders are not linked to synthetic hearings (orders.hearing_id
 --      stays NULL), so real and synthetic data never reference each other.
---   6. CURRENT_DATE makes the generated dates depend on the day this runs.
-
-BEGIN;
+--   6. Pending cases' hearings end at the seed anchor date (2026-10-03), not
+--      the day the migration runs; they do not move as time passes.
 
 -- ===========================================================================
 -- Part 1: stated counts
@@ -129,7 +140,8 @@ WITH base AS (
            s.times_listed                         AS n,
            coalesce(s.times_adjourned, 0)         AS a,
            c.filed_on                             AS f,
-           coalesce(c.disposed_on, CURRENT_DATE)  AS e,
+           coalesce(c.disposed_on,
+                    current_setting('app.seed_anchor_date')::date) AS e,
            (c.status = 'disposed')                AS ends_in_disposal
     FROM case_listing_stats s
     JOIN cases c ON c.id = s.case_id
@@ -137,7 +149,7 @@ WITH base AS (
 ),
 slots AS (
     -- n evenly spaced dates. Disposed cases end on disposed_on; others stop
-    -- short of CURRENT_DATE.
+    -- short of the seed anchor date.
     SELECT b.*, i,
            CASE WHEN b.ends_in_disposal
                 THEN b.f + (i * (b.e - b.f)) / b.n

@@ -5,7 +5,9 @@
 - Files live in `db/migrations/NNN_name.sql`, each wrapped in one transaction
   (except `ALTER TYPE ... ADD VALUE`, which must commit before the new value
   is used; see 007).
-- Reusable queries live in `db/queries/`.
+- Reusable queries live in `db/queries/`; tests in `db/tests/` (run with psql).
+- Seeds must be reproducible: never use `CURRENT_DATE` or `now()` to generate
+  data. Use a fixed anchor date (see 010's `app.seed_anchor_date`).
 - Run every migration on a temporary Neon branch first, then on `production`.
 - Seed only what `DOMAIN.md` states. Anything unstated goes in a KNOWN GAPS
   comment block in the migration, not into the data.
@@ -13,9 +15,9 @@
 ## SQL coverage
 
 Tracks which SQL command categories the project uses, for the report. Counts
-only SQL committed in `db/migrations/` or `db/queries/`, not ad-hoc queries.
-Record the file where each first appears, and update this list in the same
-commit as every new migration or query.
+only SQL committed in `db/migrations/`, `db/queries/` or `db/tests/`, not
+ad-hoc queries. Record the file where each first appears, and update this
+list in the same commit as every new migration, query or test.
 
 ### DDL
 
@@ -51,6 +53,6 @@ commit as every new migration or query.
 ### TCL
 
 - [x] BEGIN: 001
-- [x] COMMIT: 001
-- [ ] ROLLBACK
-- [ ] SAVEPOINT
+- [x] COMMIT: 001 (also ends `tests/integrity_test.sql` after its rollbacks)
+- [x] ROLLBACK: `tests/integrity_test.sql` (`ROLLBACK TO SAVEPOINT`)
+- [x] SAVEPOINT: `tests/integrity_test.sql` (one per test)
