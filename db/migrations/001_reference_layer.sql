@@ -122,6 +122,21 @@ CREATE VIEW usable_limitation_rules AS
 
 -- ===========================================================================
 -- Seed data (DOMAIN.md only)
+--
+-- KNOWN GAPS in case_type_remedies. DOMAIN.md does not state these, so they
+-- are deliberately NOT seeded. Resolve in DOMAIN.md first, then seed in a
+-- later migration. The appeal-direction trigger validates against this table.
+--   1. C.C. revision lists the High Court only; G.R. lists Sessions or High
+--      Court. Confirm whether C.C. revision also lies to Sessions.
+--   2. N.I. Act (s.138) lists no revision route at all.
+--   3. Cr. Appeal and Cr. Revision list no onward remedies, so appeal chains
+--      2-3 levels deep cannot be validated yet.
+--   4. Appeal against acquittal is not modelled: remedies record forum only,
+--      not who may appeal (complainant's appeal goes to the High Court with
+--      special leave, not to Sessions).
+--
+-- OTHER GAPS: DOMAIN.md's "Example cases" section is still a placeholder, so
+-- no district courts, judges, or IPC/BNS provisions are seeded here.
 -- ===========================================================================
 
 INSERT INTO court_levels (level, name) VALUES
