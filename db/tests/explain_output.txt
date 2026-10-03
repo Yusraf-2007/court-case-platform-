@@ -1,0 +1,950 @@
+Raw EXPLAIN ANALYZE output for db/tests/benchmark.ts
+Run on: Neon project late-glitter-91959782, throwaway branch "benchmark-test"
+        (copied from production on 2026-10-03, PostgreSQL 18.6), since deleted.
+
+Each query ran EXPLAIN ANALYZE 5 times WITHOUT the indexes its plan uses, then
+5 times WITH them. Primary-key indexes are never dropped. For each block below:
+all five Execution Times are listed, followed by the full plan of the median run.
+
+scale 1    = the real dataset: 57 cases, 527 hearings, 47 orders, 28 relationships
+scale 1000 = the dataset cloned 1000 times on the branch:
+             57,057 cases, 527,527 hearings, 47,047 orders, 28,028 relationships
+
+Parameters: Case 1 = cases.id 28 (G.R. 412/2024); court = JMFC Court No. 3,
+Begusarai (courts.id 6); stage = prosecution_evidence; status = pending;
+cause-list date = 2024-10-31.
+
+=================== scale 1 | case_list | WITHOUT indexes ===================
+dropped: none
+Execution Time per run: 1: 0.068 ms, 2: 0.081 ms, 3: 0.062 ms, 4: 0.046 ms, 5: 0.062 ms
+median run: 5
+
+Sort  (cost=18.35..18.36 rows=1 width=84) (actual time=0.040..0.041 rows=2.00 loops=1)
+  Sort Key: c.filed_on, c.id
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=9
+  ->  Nested Loop  (cost=0.30..18.34 rows=1 width=84) (actual time=0.024..0.031 rows=2.00 loops=1)
+        Buffers: shared hit=9
+        ->  Nested Loop  (cost=0.15..10.14 rows=1 width=66) (actual time=0.018..0.022 rows=2.00 loops=1)
+              Buffers: shared hit=5
+              ->  Seq Scan on cases c  (cost=0.00..1.95 rows=1 width=42) (actual time=0.009..0.011 rows=2.00 loops=1)
+                    Filter: ((court_id = 6) AND (stage = 'prosecution_evidence'::case_stage) AND (status = 'pending'::case_status))
+                    Rows Removed by Filter: 55
+                    Buffers: shared hit=1
+              ->  Index Scan using case_types_pkey on case_types ct  (cost=0.15..8.17 rows=1 width=40) (actual time=0.004..0.004 rows=1.00 loops=2)
+                    Index Cond: (id = c.case_type_id)
+                    Index Searches: 2
+                    Buffers: shared hit=4
+        ->  Index Scan using courts_pkey on courts co  (cost=0.15..8.17 rows=1 width=40) (actual time=0.003..0.003 rows=1.00 loops=2)
+              Index Cond: (id = 6)
+              Index Searches: 2
+              Buffers: shared hit=4
+Planning Time: 0.122 ms
+Execution Time: 0.062 ms
+
+=================== scale 1 | case_list | WITH indexes ===================
+dropped: none
+Execution Time per run: 1: 0.054 ms, 2: 0.060 ms, 3: 0.044 ms, 4: 0.103 ms, 5: 0.046 ms
+median run: 1
+
+Sort  (cost=18.35..18.36 rows=1 width=84) (actual time=0.033..0.033 rows=2.00 loops=1)
+  Sort Key: c.filed_on, c.id
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=9
+  ->  Nested Loop  (cost=0.30..18.34 rows=1 width=84) (actual time=0.022..0.029 rows=2.00 loops=1)
+        Buffers: shared hit=9
+        ->  Nested Loop  (cost=0.15..10.14 rows=1 width=66) (actual time=0.018..0.022 rows=2.00 loops=1)
+              Buffers: shared hit=5
+              ->  Seq Scan on cases c  (cost=0.00..1.95 rows=1 width=42) (actual time=0.009..0.012 rows=2.00 loops=1)
+                    Filter: ((court_id = 6) AND (stage = 'prosecution_evidence'::case_stage) AND (status = 'pending'::case_status))
+                    Rows Removed by Filter: 55
+                    Buffers: shared hit=1
+              ->  Index Scan using case_types_pkey on case_types ct  (cost=0.15..8.17 rows=1 width=40) (actual time=0.004..0.004 rows=1.00 loops=2)
+                    Index Cond: (id = c.case_type_id)
+                    Index Searches: 2
+                    Buffers: shared hit=4
+        ->  Index Scan using courts_pkey on courts co  (cost=0.15..8.17 rows=1 width=40) (actual time=0.001..0.002 rows=1.00 loops=2)
+              Index Cond: (id = 6)
+              Index Searches: 2
+              Buffers: shared hit=4
+Planning Time: 0.133 ms
+Execution Time: 0.054 ms
+
+=================== scale 1 | case_family | WITHOUT indexes ===================
+dropped: case_relationships_unique_edge, case_relationships_to_case_id_idx
+Execution Time per run: 1: 0.937 ms, 2: 0.178 ms, 3: 0.141 ms, 4: 0.128 ms, 5: 0.126 ms
+median run: 3
+
+Sort  (cost=802.51..802.52 rows=2 width=80) (actual time=0.101..0.103 rows=5.00 loops=1)
+  Sort Key: ranked.depth, ranked.case_id, ranked.rel_type, ranked.direction
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=7
+  CTE family
+    ->  Recursive Union  (cost=0.00..764.11 rows=411 width=80) (actual time=0.009..0.080 rows=9.00 loops=1)
+          Storage: Memory  Maximum Storage: 33kB
+          Buffers: shared hit=7
+          ->  Seq Scan on cases c  (cost=0.00..1.68 rows=1 width=80) (actual time=0.008..0.009 rows=1.00 loops=1)
+                Filter: (id = 28)
+                Rows Removed by Filter: 56
+                Buffers: shared hit=1
+          ->  Hash Join  (cost=0.26..75.83 rows=41 width=80) (actual time=0.011..0.022 rows=2.67 loops=3)
+                Hash Cond: (case_relationships.from_case_id = f.case_id)
+                Join Filter: (case_relationships.to_case_id <> ALL (f.path))
+                Rows Removed by Join Filter: 4
+                Buffers: shared hit=6
+                ->  Append  (cost=0.00..63.50 rows=2900 width=52) (actual time=0.001..0.012 rows=56.00 loops=3)
+                      Buffers: shared hit=6
+                      ->  Seq Scan on case_relationships  (cost=0.00..24.50 rows=1450 width=52) (actual time=0.001..0.004 rows=28.00 loops=3)
+                            Buffers: shared hit=3
+                      ->  Seq Scan on case_relationships case_relationships_1  (cost=0.00..24.50 rows=1450 width=52) (actual time=0.001..0.003 rows=28.00 loops=3)
+                            Buffers: shared hit=3
+                ->  Hash  (cost=0.22..0.22 rows=3 width=44) (actual time=0.002..0.002 rows=3.00 loops=3)
+                      Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                      ->  WorkTable Scan on family f  (cost=0.00..0.22 rows=3 width=44) (actual time=0.001..0.001 rows=3.00 loops=3)
+                            Filter: (depth < 25)
+  ->  Subquery Scan on ranked  (cost=26.08..38.39 rows=2 width=80) (actual time=0.092..0.097 rows=5.00 loops=1)
+        Filter: (ranked.depth = ranked.shortest)
+        Rows Removed by Filter: 4
+        Buffers: shared hit=7
+        ->  WindowAgg  (cost=26.08..33.26 rows=411 width=84) (actual time=0.091..0.096 rows=9.00 loops=1)
+              Window: w1 AS (PARTITION BY family.case_id)
+              Storage: Memory  Maximum Storage: 17kB
+              Buffers: shared hit=7
+              ->  Sort  (cost=26.06..27.09 rows=411 width=80) (actual time=0.087..0.088 rows=9.00 loops=1)
+                    Sort Key: family.case_id
+                    Sort Method: quicksort  Memory: 25kB
+                    Buffers: shared hit=7
+                    ->  CTE Scan on family  (cost=0.00..8.22 rows=411 width=80) (actual time=0.012..0.085 rows=9.00 loops=1)
+                          Storage: Memory  Maximum Storage: 17kB
+                          Buffers: shared hit=7
+Planning Time: 0.131 ms
+Execution Time: 0.141 ms
+
+=================== scale 1 | case_family | WITH indexes ===================
+dropped: case_relationships_unique_edge, case_relationships_to_case_id_idx
+Execution Time per run: 1: 0.154 ms, 2: 0.144 ms, 3: 0.139 ms, 4: 0.139 ms, 5: 0.137 ms
+median run: 4
+
+Sort  (cost=38.26..38.27 rows=1 width=80) (actual time=0.102..0.104 rows=5.00 loops=1)
+  Sort Key: ranked.depth, ranked.case_id, ranked.rel_type, ranked.direction
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=7
+  CTE family
+    ->  Recursive Union  (cost=0.00..35.94 rows=31 width=80) (actual time=0.009..0.078 rows=9.00 loops=1)
+          Storage: Memory  Maximum Storage: 33kB
+          Buffers: shared hit=7
+          ->  Seq Scan on cases c  (cost=0.00..1.68 rows=1 width=80) (actual time=0.008..0.009 rows=1.00 loops=1)
+                Filter: (id = 28)
+                Rows Removed by Filter: 56
+                Buffers: shared hit=1
+          ->  Hash Join  (cost=0.26..3.40 rows=3 width=80) (actual time=0.011..0.021 rows=2.67 loops=3)
+                Hash Cond: (case_relationships.from_case_id = f.case_id)
+                Join Filter: (case_relationships.to_case_id <> ALL (f.path))
+                Rows Removed by Join Filter: 4
+                Buffers: shared hit=6
+                ->  Append  (cost=0.00..2.84 rows=56 width=52) (actual time=0.001..0.012 rows=56.00 loops=3)
+                      Buffers: shared hit=6
+                      ->  Seq Scan on case_relationships  (cost=0.00..1.28 rows=28 width=52) (actual time=0.001..0.004 rows=28.00 loops=3)
+                            Buffers: shared hit=3
+                      ->  Seq Scan on case_relationships case_relationships_1  (cost=0.00..1.28 rows=28 width=52) (actual time=0.001..0.004 rows=28.00 loops=3)
+                            Buffers: shared hit=3
+                ->  Hash  (cost=0.22..0.22 rows=3 width=44) (actual time=0.002..0.002 rows=3.00 loops=3)
+                      Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                      ->  WorkTable Scan on family f  (cost=0.00..0.22 rows=3 width=44) (actual time=0.001..0.001 rows=3.00 loops=3)
+                            Filter: (depth < 25)
+  ->  Subquery Scan on ranked  (cost=1.39..2.32 rows=1 width=80) (actual time=0.088..0.099 rows=5.00 loops=1)
+        Filter: (ranked.depth = ranked.shortest)
+        Rows Removed by Filter: 4
+        Buffers: shared hit=7
+        ->  WindowAgg  (cost=1.39..1.93 rows=31 width=84) (actual time=0.087..0.097 rows=9.00 loops=1)
+              Window: w1 AS (PARTITION BY family.case_id)
+              Storage: Memory  Maximum Storage: 17kB
+              Buffers: shared hit=7
+              ->  Sort  (cost=1.39..1.47 rows=31 width=80) (actual time=0.084..0.084 rows=9.00 loops=1)
+                    Sort Key: family.case_id
+                    Sort Method: quicksort  Memory: 25kB
+                    Buffers: shared hit=7
+                    ->  CTE Scan on family  (cost=0.00..0.62 rows=31 width=80) (actual time=0.009..0.081 rows=9.00 loops=1)
+                          Storage: Memory  Maximum Storage: 17kB
+                          Buffers: shared hit=7
+Planning Time: 0.156 ms
+Execution Time: 0.139 ms
+
+=================== scale 1 | case_timeline | WITHOUT indexes ===================
+dropped: hearings_one_per_case_per_day
+Execution Time per run: 1: 5.323 ms, 2: 0.132 ms, 3: 0.126 ms, 4: 0.126 ms, 5: 0.173 ms
+median run: 2
+
+Sort  (cost=38.81..38.88 rows=29 width=153) (actual time=0.087..0.089 rows=29.00 loops=1)
+  Sort Key: "*SELECT* 1".entry_date, "*SELECT* 1".same_day_rank, "*SELECT* 1".entry_id
+  Sort Method: quicksort  Memory: 27kB
+  Buffers: shared hit=14
+  ->  Append  (cost=0.16..38.10 rows=29 width=153) (actual time=0.032..0.077 rows=29.00 loops=1)
+        Buffers: shared hit=14
+        ->  Subquery Scan on "*SELECT* 1"  (cost=0.16..23.24 rows=23 width=150) (actual time=0.032..0.061 rows=23.00 loops=1)
+              Buffers: shared hit=11
+              ->  Nested Loop Left Join  (cost=0.16..23.01 rows=23 width=150) (actual time=0.031..0.058 rows=23.00 loops=1)
+                    Buffers: shared hit=11
+                    ->  Seq Scan on hearings h  (cost=0.00..15.59 rows=23 width=65) (actual time=0.021..0.035 rows=23.00 loops=1)
+                          Filter: (case_id = 28)
+                          Rows Removed by Filter: 504
+                          Buffers: shared hit=9
+                    ->  Memoize  (cost=0.16..2.26 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=23)
+                          Cache Key: h.judge_id
+                          Cache Mode: logical
+                          Hits: 22  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                          Buffers: shared hit=2
+                          ->  Index Scan using judges_pkey on judges j  (cost=0.15..2.25 rows=1 width=40) (actual time=0.004..0.005 rows=1.00 loops=1)
+                                Index Cond: (id = h.judge_id)
+                                Index Searches: 1
+                                Buffers: shared hit=2
+        ->  Subquery Scan on "*SELECT* 2"  (cost=0.16..14.71 rows=6 width=163) (actual time=0.007..0.013 rows=6.00 loops=1)
+              Buffers: shared hit=3
+              ->  Nested Loop Left Join  (cost=0.16..14.65 rows=6 width=163) (actual time=0.006..0.012 rows=6.00 loops=1)
+                    Buffers: shared hit=3
+                    ->  Seq Scan on orders o  (cost=0.00..1.59 rows=6 width=70) (actual time=0.003..0.006 rows=6.00 loops=1)
+                          Filter: (case_id = 28)
+                          Rows Removed by Filter: 41
+                          Buffers: shared hit=1
+                    ->  Memoize  (cost=0.16..4.84 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=6)
+                          Cache Key: o.judge_id
+                          Cache Mode: logical
+                          Hits: 5  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                          Buffers: shared hit=2
+                          ->  Index Scan using judges_pkey on judges j_1  (cost=0.15..4.83 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=1)
+                                Index Cond: (id = o.judge_id)
+                                Index Searches: 1
+                                Buffers: shared hit=2
+Planning Time: 0.185 ms
+Execution Time: 0.132 ms
+
+=================== scale 1 | case_timeline | WITH indexes ===================
+dropped: hearings_one_per_case_per_day
+Execution Time per run: 1: 0.150 ms, 2: 0.105 ms, 3: 0.101 ms, 4: 0.177 ms, 5: 0.108 ms
+median run: 5
+
+Sort  (cost=36.96..37.03 rows=29 width=153) (actual time=0.065..0.067 rows=29.00 loops=1)
+  Sort Key: "*SELECT* 1".entry_date, "*SELECT* 1".same_day_rank, "*SELECT* 1".entry_id
+  Sort Method: quicksort  Memory: 27kB
+  Buffers: shared hit=9
+  ->  Append  (cost=4.61..36.25 rows=29 width=153) (actual time=0.022..0.055 rows=29.00 loops=1)
+        Buffers: shared hit=9
+        ->  Subquery Scan on "*SELECT* 1"  (cost=4.61..21.40 rows=23 width=150) (actual time=0.021..0.040 rows=23.00 loops=1)
+              Buffers: shared hit=6
+              ->  Nested Loop Left Join  (cost=4.61..21.17 rows=23 width=150) (actual time=0.021..0.037 rows=23.00 loops=1)
+                    Buffers: shared hit=6
+                    ->  Bitmap Heap Scan on hearings h  (cost=4.45..13.74 rows=23 width=65) (actual time=0.014..0.017 rows=23.00 loops=1)
+                          Recheck Cond: (case_id = 28)
+                          Heap Blocks: exact=1
+                          Buffers: shared hit=4
+                          ->  Bitmap Index Scan on hearings_one_per_case_per_day  (cost=0.00..4.45 rows=23 width=0) (actual time=0.008..0.008 rows=23.00 loops=1)
+                                Index Cond: (case_id = 28)
+                                Index Searches: 1
+                                Buffers: shared hit=3
+                    ->  Memoize  (cost=0.16..2.26 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=23)
+                          Cache Key: h.judge_id
+                          Cache Mode: logical
+                          Hits: 22  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                          Buffers: shared hit=2
+                          ->  Index Scan using judges_pkey on judges j  (cost=0.15..2.25 rows=1 width=40) (actual time=0.002..0.003 rows=1.00 loops=1)
+                                Index Cond: (id = h.judge_id)
+                                Index Searches: 1
+                                Buffers: shared hit=2
+        ->  Subquery Scan on "*SELECT* 2"  (cost=0.16..14.71 rows=6 width=163) (actual time=0.006..0.013 rows=6.00 loops=1)
+              Buffers: shared hit=3
+              ->  Nested Loop Left Join  (cost=0.16..14.65 rows=6 width=163) (actual time=0.006..0.012 rows=6.00 loops=1)
+                    Buffers: shared hit=3
+                    ->  Seq Scan on orders o  (cost=0.00..1.59 rows=6 width=70) (actual time=0.003..0.006 rows=6.00 loops=1)
+                          Filter: (case_id = 28)
+                          Rows Removed by Filter: 41
+                          Buffers: shared hit=1
+                    ->  Memoize  (cost=0.16..4.84 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=6)
+                          Cache Key: o.judge_id
+                          Cache Mode: logical
+                          Hits: 5  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                          Buffers: shared hit=2
+                          ->  Index Scan using judges_pkey on judges j_1  (cost=0.15..4.83 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=1)
+                                Index Cond: (id = o.judge_id)
+                                Index Searches: 1
+                                Buffers: shared hit=2
+Planning Time: 0.222 ms
+Execution Time: 0.108 ms
+
+=================== scale 1 | adjournment_analysis | WITHOUT indexes ===================
+dropped: none
+Execution Time per run: 1: 0.501 ms, 2: 0.436 ms, 3: 0.414 ms, 4: 0.398 ms, 5: 0.693 ms
+median run: 2
+
+Sort  (cost=71.26..71.81 rows=219 width=148) (actual time=0.381..0.384 rows=18.00 loops=1)
+  Sort Key: (count(*)) DESC, co.name, ct.code, (COALESCE((h.adjournment_reason)::text, 'not recorded'::text))
+  Sort Method: quicksort  Memory: 26kB
+  Buffers: shared hit=44
+  ->  WindowAgg  (cost=50.70..62.75 rows=219 width=148) (actual time=0.317..0.375 rows=18.00 loops=1)
+        Window: w1 AS (PARTITION BY co.name)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=44
+        ->  GroupAggregate  (cost=50.70..56.18 rows=219 width=84) (actual time=0.299..0.350 rows=18.00 loops=1)
+              Group Key: co.name, ct.code, h.adjournment_reason
+              Buffers: shared hit=44
+              ->  Sort  (cost=50.70..51.25 rows=219 width=69) (actual time=0.294..0.307 rows=219.00 loops=1)
+                    Sort Key: co.name, ct.code, h.adjournment_reason
+                    Sort Method: quicksort  Memory: 35kB
+                    Buffers: shared hit=44
+                    ->  Hash Join  (cost=23.59..42.19 rows=219 width=69) (actual time=0.104..0.193 rows=219.00 loops=1)
+                          Hash Cond: (h.case_id = c.id)
+                          Buffers: shared hit=44
+                          ->  Seq Scan on hearings h  (cost=0.00..15.59 rows=219 width=13) (actual time=0.009..0.056 rows=219.00 loops=1)
+                                Filter: (outcome = 'adjourned'::hearing_outcome)
+                                Rows Removed by Filter: 308
+                                Buffers: shared hit=9
+                          ->  Hash  (cost=22.91..22.91 rows=54 width=72) (actual time=0.092..0.093 rows=57.00 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                Buffers: shared hit=35
+                                ->  Nested Loop  (cost=0.32..22.91 rows=54 width=72) (actual time=0.014..0.074 rows=57.00 loops=1)
+                                      Buffers: shared hit=35
+                                      ->  Nested Loop  (cost=0.16..14.31 rows=54 width=48) (actual time=0.010..0.046 rows=57.00 loops=1)
+                                            Buffers: shared hit=21
+                                            ->  Seq Scan on cases c  (cost=0.00..1.54 rows=54 width=24) (actual time=0.004..0.007 rows=57.00 loops=1)
+                                                  Buffers: shared hit=1
+                                            ->  Memoize  (cost=0.16..1.07 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=57)
+                                                  Cache Key: c.court_id
+                                                  Cache Mode: logical
+                                                  Hits: 47  Misses: 10  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                  Buffers: shared hit=20
+                                                  ->  Index Scan using courts_pkey on courts co  (cost=0.15..1.06 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=10)
+                                                        Index Cond: (id = c.court_id)
+                                                        Index Searches: 10
+                                                        Buffers: shared hit=20
+                                      ->  Memoize  (cost=0.16..1.06 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=57)
+                                            Cache Key: c.case_type_id
+                                            Cache Mode: logical
+                                            Hits: 50  Misses: 7  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                            Buffers: shared hit=14
+                                            ->  Index Scan using case_types_pkey on case_types ct  (cost=0.15..1.05 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=7)
+                                                  Index Cond: (id = c.case_type_id)
+                                                  Index Searches: 7
+                                                  Buffers: shared hit=14
+Planning:
+  Buffers: shared hit=16
+Planning Time: 0.629 ms
+Execution Time: 0.436 ms
+
+=================== scale 1 | adjournment_analysis | WITH indexes ===================
+dropped: none
+Execution Time per run: 1: 0.418 ms, 2: 0.421 ms, 3: 0.435 ms, 4: 0.412 ms, 5: 0.414 ms
+median run: 1
+
+Sort  (cost=71.26..71.81 rows=219 width=148) (actual time=0.368..0.370 rows=18.00 loops=1)
+  Sort Key: (count(*)) DESC, co.name, ct.code, (COALESCE((h.adjournment_reason)::text, 'not recorded'::text))
+  Sort Method: quicksort  Memory: 26kB
+  Buffers: shared hit=44
+  ->  WindowAgg  (cost=50.70..62.75 rows=219 width=148) (actual time=0.304..0.361 rows=18.00 loops=1)
+        Window: w1 AS (PARTITION BY co.name)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=44
+        ->  GroupAggregate  (cost=50.70..56.18 rows=219 width=84) (actual time=0.289..0.340 rows=18.00 loops=1)
+              Group Key: co.name, ct.code, h.adjournment_reason
+              Buffers: shared hit=44
+              ->  Sort  (cost=50.70..51.25 rows=219 width=69) (actual time=0.285..0.298 rows=219.00 loops=1)
+                    Sort Key: co.name, ct.code, h.adjournment_reason
+                    Sort Method: quicksort  Memory: 35kB
+                    Buffers: shared hit=44
+                    ->  Hash Join  (cost=23.59..42.19 rows=219 width=69) (actual time=0.104..0.189 rows=219.00 loops=1)
+                          Hash Cond: (h.case_id = c.id)
+                          Buffers: shared hit=44
+                          ->  Seq Scan on hearings h  (cost=0.00..15.59 rows=219 width=13) (actual time=0.008..0.052 rows=219.00 loops=1)
+                                Filter: (outcome = 'adjourned'::hearing_outcome)
+                                Rows Removed by Filter: 308
+                                Buffers: shared hit=9
+                          ->  Hash  (cost=22.91..22.91 rows=54 width=72) (actual time=0.087..0.088 rows=57.00 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                Buffers: shared hit=35
+                                ->  Nested Loop  (cost=0.32..22.91 rows=54 width=72) (actual time=0.019..0.079 rows=57.00 loops=1)
+                                      Buffers: shared hit=35
+                                      ->  Nested Loop  (cost=0.16..14.31 rows=54 width=48) (actual time=0.011..0.045 rows=57.00 loops=1)
+                                            Buffers: shared hit=21
+                                            ->  Seq Scan on cases c  (cost=0.00..1.54 rows=54 width=24) (actual time=0.004..0.007 rows=57.00 loops=1)
+                                                  Buffers: shared hit=1
+                                            ->  Memoize  (cost=0.16..1.07 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=57)
+                                                  Cache Key: c.court_id
+                                                  Cache Mode: logical
+                                                  Hits: 47  Misses: 10  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                                                  Buffers: shared hit=20
+                                                  ->  Index Scan using courts_pkey on courts co  (cost=0.15..1.06 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=10)
+                                                        Index Cond: (id = c.court_id)
+                                                        Index Searches: 10
+                                                        Buffers: shared hit=20
+                                      ->  Memoize  (cost=0.16..1.06 rows=1 width=40) (actual time=0.000..0.000 rows=1.00 loops=57)
+                                            Cache Key: c.case_type_id
+                                            Cache Mode: logical
+                                            Hits: 50  Misses: 7  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                            Buffers: shared hit=14
+                                            ->  Index Scan using case_types_pkey on case_types ct  (cost=0.15..1.05 rows=1 width=40) (actual time=0.001..0.001 rows=1.00 loops=7)
+                                                  Index Cond: (id = c.case_type_id)
+                                                  Index Searches: 7
+                                                  Buffers: shared hit=14
+Planning:
+  Buffers: shared hit=16
+Planning Time: 0.286 ms
+Execution Time: 0.418 ms
+
+=================== scale 1 | cause_list | WITHOUT indexes ===================
+dropped: none
+Execution Time per run: 1: 0.086 ms, 2: 0.112 ms, 3: 0.077 ms, 4: 0.070 ms, 5: 0.066 ms
+median run: 3
+
+Sort  (cost=22.22..22.22 rows=1 width=119) (actual time=0.052..0.053 rows=1.00 loops=1)
+  Sort Key: ct.code, c.case_year, c.case_number
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=12
+  ->  Nested Loop  (cost=0.15..22.21 rows=1 width=119) (actual time=0.036..0.049 rows=1.00 loops=1)
+        Buffers: shared hit=12
+        ->  Nested Loop  (cost=0.00..17.34 rows=1 width=63) (actual time=0.031..0.044 rows=1.00 loops=1)
+              Join Filter: (h.case_id = c.id)
+              Rows Removed by Join Filter: 5
+              Buffers: shared hit=10
+              ->  Seq Scan on hearings h  (cost=0.00..15.59 rows=1 width=53) (actual time=0.019..0.031 rows=1.00 loops=1)
+                    Filter: (hearing_date = '2024-10-31'::date)
+                    Rows Removed by Filter: 526
+                    Buffers: shared hit=9
+              ->  Seq Scan on cases c  (cost=0.00..1.68 rows=6 width=26) (actual time=0.004..0.004 rows=6.00 loops=1)
+                    Filter: (court_id = 6)
+                    Rows Removed by Filter: 22
+                    Buffers: shared hit=1
+        ->  Index Scan using case_types_pkey on case_types ct  (cost=0.15..4.83 rows=1 width=40) (actual time=0.003..0.003 rows=1.00 loops=1)
+              Index Cond: (id = c.case_type_id)
+              Index Searches: 1
+              Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=16
+Planning Time: 0.181 ms
+Execution Time: 0.077 ms
+
+=================== scale 1 | cause_list | WITH indexes ===================
+dropped: none
+Execution Time per run: 1: 0.071 ms, 2: 0.070 ms, 3: 0.066 ms, 4: 0.072 ms, 5: 0.065 ms
+median run: 2
+
+Sort  (cost=22.22..22.22 rows=1 width=119) (actual time=0.046..0.047 rows=1.00 loops=1)
+  Sort Key: ct.code, c.case_year, c.case_number
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=12
+  ->  Nested Loop  (cost=0.15..22.21 rows=1 width=119) (actual time=0.030..0.043 rows=1.00 loops=1)
+        Buffers: shared hit=12
+        ->  Nested Loop  (cost=0.00..17.34 rows=1 width=63) (actual time=0.026..0.039 rows=1.00 loops=1)
+              Join Filter: (h.case_id = c.id)
+              Rows Removed by Join Filter: 5
+              Buffers: shared hit=10
+              ->  Seq Scan on hearings h  (cost=0.00..15.59 rows=1 width=53) (actual time=0.020..0.033 rows=1.00 loops=1)
+                    Filter: (hearing_date = '2024-10-31'::date)
+                    Rows Removed by Filter: 526
+                    Buffers: shared hit=9
+              ->  Seq Scan on cases c  (cost=0.00..1.68 rows=6 width=26) (actual time=0.003..0.004 rows=6.00 loops=1)
+                    Filter: (court_id = 6)
+                    Rows Removed by Filter: 22
+                    Buffers: shared hit=1
+        ->  Index Scan using case_types_pkey on case_types ct  (cost=0.15..4.83 rows=1 width=40) (actual time=0.003..0.003 rows=1.00 loops=1)
+              Index Cond: (id = c.case_type_id)
+              Index Searches: 1
+              Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=16
+Planning Time: 0.185 ms
+Execution Time: 0.070 ms
+
+=================== scale 1000 | case_list | WITHOUT indexes ===================
+dropped: cases_court_id_idx
+Execution Time per run: 1: 5.428 ms, 2: 5.521 ms, 3: 5.413 ms, 4: 5.315 ms, 5: 5.396 ms
+median run: 3
+
+Sort  (cost=1510.82..1511.78 rows=387 width=80) (actual time=5.203..5.297 rows=2002.00 loops=1)
+  Sort Key: c.filed_on, c.id
+  Sort Method: quicksort  Memory: 205kB
+  Buffers: shared hit=651
+  ->  Nested Loop  (cost=330.62..1494.18 rows=387 width=80) (actual time=0.594..4.547 rows=2002.00 loops=1)
+        Buffers: shared hit=651
+        ->  Seq Scan on courts co  (cost=0.00..1.15 rows=1 width=36) (actual time=0.007..0.008 rows=1.00 loops=1)
+              Filter: (id = 6)
+              Rows Removed by Filter: 11
+              Buffers: shared hit=1
+        ->  Hash Join  (cost=330.62..1481.42 rows=387 width=38) (actual time=0.584..4.022 rows=2002.00 loops=1)
+              Hash Cond: (c.case_type_id = ct.id)
+              Buffers: shared hit=650
+              ->  Bitmap Heap Scan on cases c  (cost=329.46..1478.64 rows=387 width=42) (actual time=0.575..3.624 rows=2002.00 loops=1)
+                    Recheck Cond: (status = 'pending'::case_status)
+                    Filter: ((court_id = 6) AND (stage = 'prosecution_evidence'::case_stage))
+                    Rows Removed by Filter: 28028
+                    Heap Blocks: exact=624
+                    Buffers: shared hit=649
+                    ->  Bitmap Index Scan on cases_status_idx  (cost=0.00..329.37 rows=30010 width=0) (actual time=0.500..0.500 rows=30030.00 loops=1)
+                          Index Cond: (status = 'pending'::case_status)
+                          Index Searches: 1
+                          Buffers: shared hit=25
+              ->  Hash  (cost=1.07..1.07 rows=7 width=12) (actual time=0.006..0.006 rows=7.00 loops=1)
+                    Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                    Buffers: shared hit=1
+                    ->  Seq Scan on case_types ct  (cost=0.00..1.07 rows=7 width=12) (actual time=0.002..0.003 rows=7.00 loops=1)
+                          Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.205 ms
+Execution Time: 5.413 ms
+
+=================== scale 1000 | case_list | WITH indexes ===================
+dropped: cases_court_id_idx
+Execution Time per run: 1: 3.544 ms, 2: 4.409 ms, 3: 3.491 ms, 4: 3.406 ms, 5: 3.406 ms
+median run: 3
+
+Sort  (cost=836.92..837.88 rows=387 width=80) (actual time=3.270..3.378 rows=2002.00 loops=1)
+  Sort Key: c.filed_on, c.id
+  Sort Method: quicksort  Memory: 205kB
+  Buffers: shared hit=634
+  ->  Nested Loop  (cost=69.13..820.28 rows=387 width=80) (actual time=0.194..2.620 rows=2002.00 loops=1)
+        Buffers: shared hit=634
+        ->  Seq Scan on courts co  (cost=0.00..1.15 rows=1 width=36) (actual time=0.006..0.007 rows=1.00 loops=1)
+              Filter: (id = 6)
+              Rows Removed by Filter: 11
+              Buffers: shared hit=1
+        ->  Nested Loop  (cost=69.13..807.52 rows=387 width=38) (actual time=0.186..2.062 rows=2002.00 loops=1)
+              Buffers: shared hit=633
+              ->  Bitmap Heap Scan on cases c  (cost=68.99..797.06 rows=387 width=42) (actual time=0.181..1.344 rows=2002.00 loops=1)
+                    Recheck Cond: (court_id = 6)
+                    Filter: ((stage = 'prosecution_evidence'::case_stage) AND (status = 'pending'::case_status))
+                    Rows Removed by Filter: 4004
+                    Heap Blocks: exact=624
+                    Buffers: shared hit=631
+                    ->  Bitmap Index Scan on cases_court_id_idx  (cost=0.00..68.89 rows=5947 width=0) (actual time=0.124..0.124 rows=6006.00 loops=1)
+                          Index Cond: (court_id = 6)
+                          Index Searches: 1
+                          Buffers: shared hit=7
+              ->  Memoize  (cost=0.14..0.19 rows=1 width=12) (actual time=0.000..0.000 rows=1.00 loops=2002)
+                    Cache Key: c.case_type_id
+                    Cache Mode: logical
+                    Hits: 2001  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    Buffers: shared hit=2
+                    ->  Index Scan using case_types_pkey on case_types ct  (cost=0.13..0.18 rows=1 width=12) (actual time=0.002..0.003 rows=1.00 loops=1)
+                          Index Cond: (id = c.case_type_id)
+                          Index Searches: 1
+                          Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.199 ms
+Execution Time: 3.491 ms
+
+=================== scale 1000 | case_family | WITHOUT indexes ===================
+dropped: case_relationships_unique_edge, case_relationships_to_case_id_idx
+Execution Time per run: 1: 40.546 ms, 2: 41.314 ms, 3: 40.675 ms, 4: 40.168 ms, 5: 40.138 ms
+median run: 1
+
+Sort  (cost=15886.49..15886.59 rows=40 width=80) (actual time=40.490..40.493 rows=5.00 loops=1)
+  Sort Key: ranked.depth, ranked.case_id, ranked.rel_type, ranked.direction
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=1246
+  CTE family
+    ->  Recursive Union  (cost=0.29..14966.67 rows=8001 width=80) (actual time=0.013..40.448 rows=9.00 loops=1)
+          Storage: Memory  Maximum Storage: 33kB
+          Buffers: shared hit=1246
+          ->  Index Only Scan using cases_pkey on cases c  (cost=0.29..4.31 rows=1 width=80) (actual time=0.012..0.014 rows=1.00 loops=1)
+                Index Cond: (id = 28)
+                Heap Fetches: 0
+                Index Searches: 1
+                Buffers: shared hit=4
+          ->  Hash Join  (cost=0.26..1488.24 rows=800 width=80) (actual time=4.523..13.471 rows=2.67 loops=3)
+                Hash Cond: (case_relationships.from_case_id = f.case_id)
+                Join Filter: (case_relationships.to_case_id <> ALL (f.path))
+                Rows Removed by Join Filter: 4
+                Buffers: shared hit=1242
+                ->  Append  (cost=0.00..1254.84 rows=56056 width=52) (actual time=0.004..9.598 rows=56056.00 loops=3)
+                      Buffers: shared hit=1242
+                      ->  Seq Scan on case_relationships  (cost=0.00..487.28 rows=28028 width=52) (actual time=0.004..2.641 rows=28028.00 loops=3)
+                            Buffers: shared hit=621
+                      ->  Seq Scan on case_relationships case_relationships_1  (cost=0.00..487.28 rows=28028 width=52) (actual time=0.004..2.625 rows=28028.00 loops=3)
+                            Buffers: shared hit=621
+                ->  Hash  (cost=0.22..0.22 rows=3 width=44) (actual time=0.004..0.005 rows=3.00 loops=3)
+                      Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                      ->  WorkTable Scan on family f  (cost=0.00..0.22 rows=3 width=44) (actual time=0.001..0.002 rows=3.00 loops=3)
+                            Filter: (depth < 25)
+  ->  Subquery Scan on ranked  (cost=679.41..918.75 rows=40 width=80) (actual time=40.474..40.482 rows=5.00 loops=1)
+        Filter: (ranked.depth = ranked.shortest)
+        Rows Removed by Filter: 4
+        Buffers: shared hit=1246
+        ->  WindowAgg  (cost=679.41..818.74 rows=8001 width=84) (actual time=40.472..40.478 rows=9.00 loops=1)
+              Window: w1 AS (PARTITION BY family.case_id)
+              Storage: Memory  Maximum Storage: 17kB
+              Buffers: shared hit=1246
+              ->  Sort  (cost=678.72..698.73 rows=8001 width=80) (actual time=40.460..40.461 rows=9.00 loops=1)
+                    Sort Key: family.case_id
+                    Sort Method: quicksort  Memory: 25kB
+                    Buffers: shared hit=1246
+                    ->  CTE Scan on family  (cost=0.00..160.02 rows=8001 width=80) (actual time=0.014..40.454 rows=9.00 loops=1)
+                          Storage: Memory  Maximum Storage: 17kB
+                          Buffers: shared hit=1246
+Planning:
+  Buffers: shared hit=5
+Planning Time: 0.203 ms
+Execution Time: 40.546 ms
+
+=================== scale 1000 | case_family | WITH indexes ===================
+dropped: case_relationships_unique_edge, case_relationships_to_case_id_idx
+Execution Time per run: 1: 0.325 ms, 2: 0.166 ms, 3: 0.129 ms, 4: 0.143 ms, 5: 0.792 ms
+median run: 2
+
+Sort  (cost=1426.34..1426.44 rows=40 width=80) (actual time=0.092..0.093 rows=5.00 loops=1)
+  Sort Key: ranked.depth, ranked.case_id, ranked.rel_type, ranked.direction
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=59
+  CTE family
+    ->  Recursive Union  (cost=0.29..506.52 rows=8001 width=80) (actual time=0.013..0.069 rows=9.00 loops=1)
+          Storage: Memory  Maximum Storage: 33kB
+          Buffers: shared hit=59
+          ->  Index Only Scan using cases_pkey on cases c  (cost=0.29..4.31 rows=1 width=80) (actual time=0.012..0.013 rows=1.00 loops=1)
+                Index Cond: (id = 28)
+                Heap Fetches: 0
+                Index Searches: 1
+                Buffers: shared hit=4
+          ->  Nested Loop  (cost=0.29..42.22 rows=800 width=80) (actual time=0.009..0.017 rows=2.67 loops=3)
+                Buffers: shared hit=55
+                ->  WorkTable Scan on family f  (cost=0.00..0.22 rows=3 width=44) (actual time=0.000..0.001 rows=3.00 loops=3)
+                      Filter: (depth < 25)
+                ->  Append  (cost=0.29..12.65 rows=2 width=52) (actual time=0.003..0.005 rows=0.89 loops=9)
+                      Buffers: shared hit=55
+                      ->  Index Only Scan using case_relationships_unique_edge on case_relationships  (cost=0.29..4.32 rows=1 width=52) (actual time=0.002..0.002 rows=0.56 loops=9)
+                            Index Cond: (from_case_id = f.case_id)
+                            Filter: (to_case_id <> ALL (f.path))
+                            Rows Removed by Filter: 0
+                            Heap Fetches: 0
+                            Index Searches: 9
+                            Buffers: shared hit=28
+                      ->  Index Scan using case_relationships_to_case_id_idx on case_relationships case_relationships_1  (cost=0.29..8.32 rows=1 width=52) (actual time=0.002..0.002 rows=0.33 loops=9)
+                            Index Cond: (to_case_id = f.case_id)
+                            Filter: (from_case_id <> ALL (f.path))
+                            Rows Removed by Filter: 1
+                            Index Searches: 9
+                            Buffers: shared hit=27
+  ->  Subquery Scan on ranked  (cost=679.41..918.75 rows=40 width=80) (actual time=0.082..0.087 rows=5.00 loops=1)
+        Filter: (ranked.depth = ranked.shortest)
+        Rows Removed by Filter: 4
+        Buffers: shared hit=59
+        ->  WindowAgg  (cost=679.41..818.74 rows=8001 width=84) (actual time=0.080..0.085 rows=9.00 loops=1)
+              Window: w1 AS (PARTITION BY family.case_id)
+              Storage: Memory  Maximum Storage: 17kB
+              Buffers: shared hit=59
+              ->  Sort  (cost=678.72..698.73 rows=8001 width=80) (actual time=0.076..0.076 rows=9.00 loops=1)
+                    Sort Key: family.case_id
+                    Sort Method: quicksort  Memory: 25kB
+                    Buffers: shared hit=59
+                    ->  CTE Scan on family  (cost=0.00..160.02 rows=8001 width=80) (actual time=0.014..0.072 rows=9.00 loops=1)
+                          Storage: Memory  Maximum Storage: 17kB
+                          Buffers: shared hit=59
+Planning Time: 0.293 ms
+Execution Time: 0.166 ms
+
+=================== scale 1000 | case_timeline | WITHOUT indexes ===================
+dropped: hearings_one_per_case_per_day, orders_case_id_order_date_idx
+Execution Time per run: 1: 42.981 ms, 2: 40.158 ms, 3: 40.280 ms, 4: 39.312 ms, 5: 39.905 ms
+median run: 2
+
+Gather Merge  (cost=9465.20..9467.76 rows=22 width=131) (actual time=40.014..40.098 rows=29.00 loops=1)
+  Workers Planned: 2
+  Workers Launched: 2
+  Buffers: shared hit=5205
+  ->  Sort  (cost=8465.17..8465.20 rows=9 width=131) (actual time=30.132..30.137 rows=9.67 loops=3)
+        Sort Key: "*SELECT* 2".order_date, "*SELECT* 2"."?column?_1", "*SELECT* 2".id
+        Sort Method: quicksort  Memory: 27kB
+        Buffers: shared hit=5205
+        Worker 0:  Sort Method: quicksort  Memory: 25kB
+        Worker 1:  Sort Method: quicksort  Memory: 25kB
+        ->  Parallel Append  (cost=0.00..8465.03 rows=9 width=131) (actual time=7.549..30.102 rows=9.67 loops=3)
+              Buffers: shared hit=5159
+              ->  Subquery Scan on "*SELECT* 2"  (cost=0.00..1249.20 rows=2 width=143) (actual time=0.059..10.765 rows=6.00 loops=1)
+                    Buffers: shared hit=691
+                    ->  Nested Loop Left Join  (cost=0.00..1249.18 rows=2 width=143) (actual time=0.058..10.763 rows=6.00 loops=1)
+                          Join Filter: (j.id = o.judge_id)
+                          Buffers: shared hit=691
+                          ->  Seq Scan on orders o  (cost=0.00..1248.09 rows=2 width=70) (actual time=0.016..10.706 rows=6.00 loops=1)
+                                Filter: (case_id = 28)
+                                Rows Removed by Filter: 47041
+                                Buffers: shared hit=660
+                          ->  Materialize  (cost=0.00..1.03 rows=2 width=20) (actual time=0.002..0.002 rows=1.00 loops=6)
+                                Buffers: shared hit=1
+                                ->  Seq Scan on judges j  (cost=0.00..1.02 rows=2 width=20) (actual time=0.008..0.009 rows=1.00 loops=1)
+                                      Buffers: shared hit=1
+              ->  Subquery Scan on "*SELECT* 1"  (cost=1.04..7215.78 rows=8 width=130) (actual time=13.324..26.510 rows=7.67 loops=3)
+                    Buffers: shared hit=4468
+                    ->  Hash Left Join  (cost=1.04..7215.70 rows=8 width=130) (actual time=13.323..26.508 rows=7.67 loops=3)
+                          Hash Cond: (h.judge_id = j_1.id)
+                          Buffers: shared hit=4468
+                          ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=8 width=65) (actual time=13.317..26.498 rows=7.67 loops=3)
+                                Filter: (case_id = 28)
+                                Rows Removed by Filter: 175835
+                                Buffers: shared hit=4467
+                          ->  Hash  (cost=1.02..1.02 rows=2 width=20) (actual time=0.007..0.008 rows=2.00 loops=1)
+                                Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                Buffers: shared hit=1
+                                ->  Seq Scan on judges j_1  (cost=0.00..1.02 rows=2 width=20) (actual time=0.004..0.004 rows=2.00 loops=1)
+                                      Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=16
+Planning Time: 0.258 ms
+Execution Time: 40.158 ms
+
+=================== scale 1000 | case_timeline | WITH indexes ===================
+dropped: hearings_one_per_case_per_day, orders_case_id_order_date_idx
+Execution Time per run: 1: 0.341 ms, 2: 0.137 ms, 3: 0.120 ms, 4: 0.101 ms, 5: 0.119 ms
+median run: 3
+
+Sort  (cost=55.37..55.43 rows=22 width=131) (actual time=0.070..0.073 rows=29.00 loops=1)
+  Sort Key: "*SELECT* 1".entry_date, "*SELECT* 1".same_day_rank, "*SELECT* 1".entry_id
+  Sort Method: quicksort  Memory: 27kB
+  Buffers: shared hit=10
+  ->  Append  (cost=1.47..54.88 rows=22 width=131) (actual time=0.022..0.060 rows=29.00 loops=1)
+        Buffers: shared hit=10
+        ->  Subquery Scan on "*SELECT* 1"  (cost=1.47..43.58 rows=20 width=130) (actual time=0.021..0.043 rows=23.00 loops=1)
+              Buffers: shared hit=6
+              ->  Hash Left Join  (cost=1.47..43.38 rows=20 width=130) (actual time=0.021..0.039 rows=23.00 loops=1)
+                    Hash Cond: (h.judge_id = j.id)
+                    Buffers: shared hit=6
+                    ->  Index Scan using hearings_one_per_case_per_day on hearings h  (cost=0.42..42.02 rows=20 width=65) (actual time=0.007..0.016 rows=23.00 loops=1)
+                          Index Cond: (case_id = 28)
+                          Index Searches: 1
+                          Buffers: shared hit=5
+                    ->  Hash  (cost=1.02..1.02 rows=2 width=20) (actual time=0.008..0.009 rows=2.00 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                          Buffers: shared hit=1
+                          ->  Seq Scan on judges j  (cost=0.00..1.02 rows=2 width=20) (actual time=0.006..0.006 rows=2.00 loops=1)
+                                Buffers: shared hit=1
+        ->  Subquery Scan on "*SELECT* 2"  (cost=0.29..11.19 rows=2 width=143) (actual time=0.010..0.014 rows=6.00 loops=1)
+              Buffers: shared hit=4
+              ->  Nested Loop Left Join  (cost=0.29..11.17 rows=2 width=143) (actual time=0.009..0.013 rows=6.00 loops=1)
+                    Join Filter: (j_1.id = o.judge_id)
+                    Buffers: shared hit=4
+                    ->  Index Scan using orders_case_id_order_date_idx on orders o  (cost=0.29..10.08 rows=2 width=70) (actual time=0.004..0.005 rows=6.00 loops=1)
+                          Index Cond: (case_id = 28)
+                          Index Searches: 1
+                          Buffers: shared hit=3
+                    ->  Materialize  (cost=0.00..1.03 rows=2 width=20) (actual time=0.001..0.001 rows=1.00 loops=6)
+                          Storage: Memory  Maximum Storage: 17kB
+                          Buffers: shared hit=1
+                          ->  Seq Scan on judges j_1  (cost=0.00..1.02 rows=2 width=20) (actual time=0.002..0.002 rows=1.00 loops=1)
+                                Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=16
+Planning Time: 4.162 ms
+Execution Time: 0.120 ms
+
+=================== scale 1000 | adjournment_analysis | WITHOUT indexes ===================
+dropped: none
+Execution Time per run: 1: 290.305 ms, 2: 290.900 ms, 3: 286.520 ms, 4: 293.164 ms, 5: 283.180 ms
+median run: 1
+
+Sort  (cost=12385.91..12386.96 rows=420 width=116) (actual time=286.946..290.224 rows=18.00 loops=1)
+  Sort Key: (count(*)) DESC, co.name, ct.code, (COALESCE((h.adjournment_reason)::text, 'not recorded'::text))
+  Sort Method: quicksort  Memory: 26kB
+  Buffers: shared hit=6377
+  ->  WindowAgg  (cost=12232.18..12367.61 rows=420 width=116) (actual time=286.895..290.214 rows=18.00 loops=1)
+        Window: w1 AS (PARTITION BY co.name)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=6377
+        ->  Finalize GroupAggregate  (cost=12220.81..12355.01 rows=420 width=52) (actual time=286.878..290.179 rows=18.00 loops=1)
+              Group Key: co.name, ct.code, h.adjournment_reason
+              Buffers: shared hit=6377
+              ->  Gather Merge  (cost=12220.81..12338.21 rows=1008 width=52) (actual time=286.869..290.159 rows=54.00 loops=1)
+                    Workers Planned: 2
+                    Workers Launched: 2
+                    Buffers: shared hit=6377
+                    ->  Sort  (cost=11220.79..11221.84 rows=420 width=52) (actual time=275.223..275.229 rows=18.00 loops=3)
+                          Sort Key: co.name, ct.code, h.adjournment_reason
+                          Sort Method: quicksort  Memory: 26kB
+                          Buffers: shared hit=6377
+                          Worker 0:  Sort Method: quicksort  Memory: 26kB
+                          Worker 1:  Sort Method: quicksort  Memory: 26kB
+                          ->  Partial HashAggregate  (cost=11198.29..11202.49 rows=420 width=52) (actual time=275.176..275.184 rows=18.00 loops=3)
+                                Group Key: co.name, ct.code, h.adjournment_reason
+                                Batches: 1  Memory Usage: 48kB
+                                Buffers: shared hit=6345
+                                Worker 0:  Batches: 1  Memory Usage: 48kB
+                                Worker 1:  Batches: 1  Memory Usage: 48kB
+                                ->  Hash Join  (cost=1910.21..10066.02 rows=90581 width=37) (actual time=51.760..224.057 rows=73073.00 loops=3)
+                                      Hash Cond: (c.case_type_id = ct.id)
+                                      Buffers: shared hit=6345
+                                      ->  Hash Join  (cost=1909.05..9683.13 rows=90581 width=41) (actual time=51.736..197.223 rows=73073.00 loops=3)
+                                            Hash Cond: (c.court_id = co.id)
+                                            Buffers: shared hit=6342
+                                            ->  Hash Join  (cost=1907.78..9360.12 rows=90581 width=21) (actual time=51.716..152.095 rows=73073.00 loops=3)
+                                                  Hash Cond: (h.case_id = c.id)
+                                                  Buffers: shared hit=6339
+                                                  ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=90581 width=13) (actual time=0.006..53.714 rows=73073.00 loops=3)
+                                                        Filter: (outcome = 'adjourned'::hearing_outcome)
+                                                        Rows Removed by Filter: 102769
+                                                        Buffers: shared hit=4467
+                                                  ->  Hash  (cost=1194.57..1194.57 rows=57057 width=24) (actual time=51.609..51.610 rows=57057.00 loops=3)
+                                                        Buckets: 65536  Batches: 1  Memory Usage: 3633kB
+                                                        Buffers: shared hit=1872
+                                                        ->  Seq Scan on cases c  (cost=0.00..1194.57 rows=57057 width=24) (actual time=0.008..21.925 rows=57057.00 loops=3)
+                                                              Buffers: shared hit=1872
+                                            ->  Hash  (cost=1.12..1.12 rows=12 width=36) (actual time=0.013..0.014 rows=12.00 loops=3)
+                                                  Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                  Buffers: shared hit=3
+                                                  ->  Seq Scan on courts co  (cost=0.00..1.12 rows=12 width=36) (actual time=0.009..0.010 rows=12.00 loops=3)
+                                                        Buffers: shared hit=3
+                                      ->  Hash  (cost=1.07..1.07 rows=7 width=12) (actual time=0.019..0.019 rows=7.00 loops=3)
+                                            Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                            Buffers: shared hit=3
+                                            ->  Seq Scan on case_types ct  (cost=0.00..1.07 rows=7 width=12) (actual time=0.013..0.014 rows=7.00 loops=3)
+                                                  Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=24 read=2
+Planning Time: 0.560 ms
+Execution Time: 290.305 ms
+
+=================== scale 1000 | adjournment_analysis | WITH indexes ===================
+dropped: none
+Execution Time per run: 1: 290.031 ms, 2: 297.134 ms, 3: 293.519 ms, 4: 287.390 ms, 5: 287.342 ms
+median run: 1
+
+Sort  (cost=12385.91..12386.96 rows=420 width=116) (actual time=286.727..289.942 rows=18.00 loops=1)
+  Sort Key: (count(*)) DESC, co.name, ct.code, (COALESCE((h.adjournment_reason)::text, 'not recorded'::text))
+  Sort Method: quicksort  Memory: 26kB
+  Buffers: shared hit=6377
+  ->  WindowAgg  (cost=12232.18..12367.61 rows=420 width=116) (actual time=286.674..289.931 rows=18.00 loops=1)
+        Window: w1 AS (PARTITION BY co.name)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=6377
+        ->  Finalize GroupAggregate  (cost=12220.81..12355.01 rows=420 width=52) (actual time=286.656..289.894 rows=18.00 loops=1)
+              Group Key: co.name, ct.code, h.adjournment_reason
+              Buffers: shared hit=6377
+              ->  Gather Merge  (cost=12220.81..12338.21 rows=1008 width=52) (actual time=286.647..289.874 rows=54.00 loops=1)
+                    Workers Planned: 2
+                    Workers Launched: 2
+                    Buffers: shared hit=6377
+                    ->  Sort  (cost=11220.79..11221.84 rows=420 width=52) (actual time=277.024..277.030 rows=18.00 loops=3)
+                          Sort Key: co.name, ct.code, h.adjournment_reason
+                          Sort Method: quicksort  Memory: 26kB
+                          Buffers: shared hit=6377
+                          Worker 0:  Sort Method: quicksort  Memory: 26kB
+                          Worker 1:  Sort Method: quicksort  Memory: 26kB
+                          ->  Partial HashAggregate  (cost=11198.29..11202.49 rows=420 width=52) (actual time=276.979..276.987 rows=18.00 loops=3)
+                                Group Key: co.name, ct.code, h.adjournment_reason
+                                Batches: 1  Memory Usage: 48kB
+                                Buffers: shared hit=6345
+                                Worker 0:  Batches: 1  Memory Usage: 48kB
+                                Worker 1:  Batches: 1  Memory Usage: 48kB
+                                ->  Hash Join  (cost=1910.21..10066.02 rows=90581 width=37) (actual time=50.534..210.147 rows=73073.00 loops=3)
+                                      Hash Cond: (c.case_type_id = ct.id)
+                                      Buffers: shared hit=6345
+                                      ->  Hash Join  (cost=1909.05..9683.13 rows=90581 width=41) (actual time=47.822..180.121 rows=73073.00 loops=3)
+                                            Hash Cond: (c.court_id = co.id)
+                                            Buffers: shared hit=6342
+                                            ->  Hash Join  (cost=1907.78..9360.12 rows=90581 width=21) (actual time=47.798..142.336 rows=73073.00 loops=3)
+                                                  Hash Cond: (h.case_id = c.id)
+                                                  Buffers: shared hit=6339
+                                                  ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=90581 width=13) (actual time=0.007..54.373 rows=73073.00 loops=3)
+                                                        Filter: (outcome = 'adjourned'::hearing_outcome)
+                                                        Rows Removed by Filter: 102769
+                                                        Buffers: shared hit=4467
+                                                  ->  Hash  (cost=1194.57..1194.57 rows=57057 width=24) (actual time=47.689..47.689 rows=57057.00 loops=3)
+                                                        Buckets: 65536  Batches: 1  Memory Usage: 3633kB
+                                                        Buffers: shared hit=1872
+                                                        ->  Seq Scan on cases c  (cost=0.00..1194.57 rows=57057 width=24) (actual time=0.008..24.973 rows=57057.00 loops=3)
+                                                              Buffers: shared hit=1872
+                                            ->  Hash  (cost=1.12..1.12 rows=12 width=36) (actual time=0.015..0.016 rows=12.00 loops=3)
+                                                  Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                  Buffers: shared hit=3
+                                                  ->  Seq Scan on courts co  (cost=0.00..1.12 rows=12 width=36) (actual time=0.011..0.012 rows=12.00 loops=3)
+                                                        Buffers: shared hit=3
+                                      ->  Hash  (cost=1.07..1.07 rows=7 width=12) (actual time=2.707..2.707 rows=7.00 loops=3)
+                                            Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                            Buffers: shared hit=3
+                                            ->  Seq Scan on case_types ct  (cost=0.00..1.07 rows=7 width=12) (actual time=2.699..2.700 rows=7.00 loops=3)
+                                                  Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=26
+Planning Time: 0.475 ms
+Execution Time: 290.031 ms
+
+=================== scale 1000 | cause_list | WITHOUT indexes ===================
+dropped: case_types_code_key, cases_court_id_idx
+Execution Time per run: 1: 44.534 ms, 2: 44.181 ms, 3: 44.178 ms, 4: 47.588 ms, 5: 42.450 ms
+median run: 2
+
+Gather Merge  (cost=9531.98..9543.98 rows=103 width=91) (actual time=41.574..44.060 rows=1001.00 loops=1)
+  Workers Planned: 2
+  Workers Launched: 2
+  Buffers: shared hit=7519
+  ->  Sort  (cost=8531.96..8532.06 rows=43 width=91) (actual time=33.216..33.240 rows=333.67 loops=3)
+        Sort Key: ct.code, c.case_year, c.case_number
+        Sort Method: quicksort  Memory: 56kB
+        Buffers: shared hit=7519
+        Worker 0:  Sort Method: quicksort  Memory: 45kB
+        Worker 1:  Sort Method: quicksort  Memory: 43kB
+        ->  Hash Join  (cost=1.45..8530.79 rows=43 width=91) (actual time=0.078..32.941 rows=333.67 loops=3)
+              Hash Cond: (c.case_type_id = ct.id)
+              Buffers: shared hit=7475
+              ->  Nested Loop  (cost=0.29..8528.59 rows=43 width=63) (actual time=0.049..32.770 rows=333.67 loops=3)
+                    Buffers: shared hit=7472
+                    ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=414 width=53) (actual time=0.034..26.563 rows=333.67 loops=3)
+                          Filter: (hearing_date = '2024-10-31'::date)
+                          Rows Removed by Filter: 175509
+                          Buffers: shared hit=4467
+                    ->  Index Scan using cases_pkey on cases c  (cost=0.29..3.17 rows=1 width=26) (actual time=0.018..0.018 rows=1.00 loops=1001)
+                          Index Cond: (id = h.case_id)
+                          Filter: (court_id = 6)
+                          Index Searches: 1001
+                          Buffers: shared hit=3005
+              ->  Hash  (cost=1.07..1.07 rows=7 width=12) (actual time=0.016..0.017 rows=7.00 loops=3)
+                    Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                    Buffers: shared hit=3
+                    ->  Seq Scan on case_types ct  (cost=0.00..1.07 rows=7 width=12) (actual time=0.012..0.013 rows=7.00 loops=3)
+                          Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=22
+Planning Time: 0.429 ms
+Execution Time: 44.181 ms
+
+=================== scale 1000 | cause_list | WITH indexes ===================
+dropped: case_types_code_key, cases_court_id_idx
+Execution Time per run: 1: 52.417 ms, 2: 51.631 ms, 3: 52.303 ms, 4: 50.315 ms, 5: 54.290 ms
+median run: 3
+
+Incremental Sort  (cost=2879.35..9097.77 rows=103 width=91) (actual time=52.019..52.157 rows=1001.00 loops=1)
+  Sort Key: ct.code, c.case_year, c.case_number
+  Presorted Key: ct.code
+  Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB
+  Pre-sorted Groups: 1  Sort Method: quicksort  Average Memory: 95kB  Peak Memory: 95kB
+  Buffers: shared hit=6370
+  ->  Nested Loop  (cost=1843.19..9094.35 rows=103 width=91) (actual time=48.181..48.855 rows=1001.00 loops=1)
+        Join Filter: (c.case_type_id = ct.id)
+        Rows Removed by Join Filter: 6006
+        Buffers: shared hit=6370
+        ->  Index Scan using case_types_code_key on case_types ct  (cost=0.13..12.24 rows=7 width=12) (actual time=0.003..0.012 rows=7.00 loops=1)
+              Index Searches: 1
+              Buffers: shared hit=2
+        ->  Materialize  (cost=1843.05..9069.49 rows=103 width=63) (actual time=1.069..6.864 rows=1001.00 loops=7)
+              Storage: Memory  Maximum Storage: 87kB
+              Buffers: shared hit=6368
+              ->  Gather  (cost=1843.05..9068.98 rows=103 width=63) (actual time=7.482..47.548 rows=1001.00 loops=1)
+                    Workers Planned: 2
+                    Workers Launched: 2
+                    Buffers: shared hit=6368
+                    ->  Hash Join  (cost=843.05..8058.68 rows=43 width=63) (actual time=6.892..35.887 rows=333.67 loops=3)
+                          Hash Cond: (h.case_id = c.id)
+                          Buffers: shared hit=6368
+                          ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=414 width=53) (actual time=0.029..28.867 rows=333.67 loops=3)
+                                Filter: (hearing_date = '2024-10-31'::date)
+                                Rows Removed by Filter: 175509
+                                Buffers: shared hit=4467
+                          ->  Hash  (cost=768.72..768.72 rows=5947 width=26) (actual time=6.844..6.845 rows=6006.00 loops=3)
+                                Buckets: 8192  Batches: 1  Memory Usage: 440kB
+                                Buffers: shared hit=1901
+                                ->  Bitmap Heap Scan on cases c  (cost=70.38..768.72 rows=5947 width=26) (actual time=0.221..5.876 rows=6006.00 loops=3)
+                                      Recheck Cond: (court_id = 6)
+                                      Heap Blocks: exact=624
+                                      Buffers: shared hit=1901
+                                      ->  Bitmap Index Scan on cases_court_id_idx  (cost=0.00..68.89 rows=5947 width=0) (actual time=0.157..0.157 rows=6006.00 loops=3)
+                                            Index Cond: (court_id = 6)
+                                            Index Searches: 3
+                                            Buffers: shared hit=29
+Planning:
+  Buffers: shared hit=22
+Planning Time: 0.406 ms
+Execution Time: 52.303 ms

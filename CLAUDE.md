@@ -10,6 +10,8 @@
 - Seeds must be reproducible: never use `CURRENT_DATE` or `now()` to generate
   data. Use a fixed anchor date (see 010's `app.seed_anchor_date`).
 - Run every migration on a temporary Neon branch first, then on `production`.
+- Benchmark: `DATABASE_URL=<branch url> npm run benchmark -- --scale 1000`
+  (`db/tests/benchmark.ts`). Branches only; it refuses the production endpoint.
 - Seed only what `DOMAIN.md` states. Anything unstated goes in a KNOWN GAPS
   comment block in the migration, not into the data.
 
