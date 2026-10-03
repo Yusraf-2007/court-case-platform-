@@ -17,27 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PAGE_SIZE, getFilterOptions, listCases, parseFilters, type CaseFilters } from "@/lib/cases";
+import { formatDate, humanize, statusVariant } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Cases" };
 
 // Filters live in the URL, so every page is rendered per request.
 export const dynamic = "force-dynamic";
-
-const humanize = (v: string) => v.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-
-const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  pending: "default",
-  disposed: "secondary",
-  stayed: "outline",
-  abated: "destructive",
-};
-
-const dateFormat = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
 
 function pageHref(f: CaseFilters, page: number) {
   const q = new URLSearchParams();
@@ -162,7 +147,11 @@ export default async function CasesPage({
             ) : (
               rows.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="pl-4 font-medium">{c.case_no}</TableCell>
+                  <TableCell className="pl-4 font-medium">
+                    <Link href={`/cases/${c.id}`} className="underline-offset-4 hover:underline">
+                      {c.case_no}
+                    </Link>
+                  </TableCell>
                   <TableCell>{c.case_type}</TableCell>
                   <TableCell>{c.court}</TableCell>
                   <TableCell>{c.stage ? humanize(c.stage) : <span className="text-muted-foreground">Not recorded</span>}</TableCell>
@@ -170,7 +159,7 @@ export default async function CasesPage({
                     <Badge variant={statusVariant[c.status] ?? "outline"}>{humanize(c.status)}</Badge>
                   </TableCell>
                   <TableCell className="pr-4 text-right tabular-nums">
-                    {c.filed_on ? dateFormat.format(c.filed_on) : <span className="text-muted-foreground">Not recorded</span>}
+                    {c.filed_on ? formatDate(c.filed_on) : <span className="text-muted-foreground">Not recorded</span>}
                   </TableCell>
                 </TableRow>
               ))

@@ -1,9 +1,8 @@
 import "server-only";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { cache } from "react";
 
 import { db } from "@/lib/db";
+import { runQuery } from "@/lib/queries";
 
 export const PAGE_SIZE = 20;
 
@@ -32,14 +31,6 @@ export type FilterOptions = {
   statuses: string[];
 };
 
-// The query lives in db/queries/case_list.sql so the app, psql and the
-// benchmark all run the same SQL. Read once per server process.
-let caseListSql: string | undefined;
-function caseListQuery(): string {
-  caseListSql ??= readFileSync(join(process.cwd(), "db/queries/case_list.sql"), "utf8");
-  return caseListSql;
-}
-
 // Filter choices come from the database, so new courts, case types or enum
 // values appear without a code change. cache() dedupes within one request.
 export const getFilterOptions = cache(async (): Promise<FilterOptions> => {
@@ -63,10 +54,7 @@ export const getFilterOptions = cache(async (): Promise<FilterOptions> => {
 type CaseListRow = CaseRow & { total_count: string };
 
 function runCaseList(f: CaseFilters, limit: number, offset: number) {
-  // sql.unsafe() means only that the SQL *text* is not a tagged template: it
-  // is our own file, never user input. Every user-supplied value goes in the
-  // parameter array and reaches Postgres as a bound $n parameter.
-  return db().unsafe<CaseListRow[]>(caseListQuery(), [
+  return runQuery<CaseListRow>("case_list", [
     f.courtId,
     f.caseTypeId,
     f.stage,

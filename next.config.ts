@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // process.cwd().
   outputFileTracingIncludes: {
     "/cases": ["./db/queries/**/*.sql"],
+    "/cases/[id]": ["./db/queries/**/*.sql"],
   },
 };
 

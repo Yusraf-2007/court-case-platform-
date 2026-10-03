@@ -21,6 +21,20 @@
   (`components.json`; components live in `src/components/ui`).
 - Database access: the `postgres` package via `src/lib/db.ts`, reading
   `DATABASE_URL`. No ORM.
+- The app connects as `app_web` (migration 014), never as `neondb_owner`.
+  `app_web` holds only `app_readonly`'s rights (012): SELECT on every table,
+  no INSERT/UPDATE/DELETE/TRUNCATE, no CREATE. Every session also defaults to
+  a read-only transaction. So the application physically cannot write to the
+  database: the guarantee comes from Postgres privileges, not from app code.
+  The text-to-SQL layer will connect the same way and inherit that protection
+  for free. Even a prompt-injected or hallucinated `DELETE` is refused by the
+  database, rather than relying on prompt instructions to prevent it.
+  - Create app logins with SQL `CREATE ROLE`, not the Neon console/API: those
+    roles join `neon_superuser`, which holds `pg_write_all_data`.
+  - Keep passwords out of the repo; set them as SCRAM verifiers out of band.
+  - Use `?sslmode=require` in the URL. postgres.js passes unknown URL
+    parameters (such as Neon's `channel_binding`) to the server, which rejects
+    them.
 - Every value from a request goes to Postgres as a bound parameter: tagged
   templates (`sql\`...${v}\``) or `sql.unsafe(fileText, [values])` with `$n`
   placeholders. Never build SQL text from request data.
@@ -67,7 +81,7 @@ or script.
 
 ### DCL
 
-- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges)
+- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`)
 - [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`)
 
 ### TCL

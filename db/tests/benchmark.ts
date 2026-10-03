@@ -238,7 +238,7 @@ const benches: Bench[] = [
     // court, case type, stage, status, page size (NULL = all), offset
     params: [court_3, null, "prosecution_evidence", "pending", null, 0] },
   { name: "case_family (Case 1)", file: "case_family.sql", params: { case_id: case_1 } },
-  { name: "case_timeline (Case 1)", file: "case_timeline.sql", params: { case_id: case_1 } },
+  { name: "case_timeline (Case 1)", file: "case_timeline.sql", params: [case_1] },
   { name: "adjournment_analysis", file: "adjournment_analysis.sql", params: {} },
   { name: "cause list (court, date)", file: "cause_list.sql",
     params: { court_id: court_3, hearing_date: "2024-10-31" } },
