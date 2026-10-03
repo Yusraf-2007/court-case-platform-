@@ -14,6 +14,17 @@ Parameters: Case 1 = cases.id 28 (G.R. 412/2024); court = JMFC Court No. 3,
 Begusarai (courts.id 6); stage = prosecution_evidence; status = pending;
 cause-list date = 2024-10-31.
 
+Contents:
+  Part 1  First run: all five queries at scale 1 and scale 1000. The cause
+          list is the diagnosis: with or without its indexes, its plan reads
+          the whole hearings table (Parallel Seq Scan on hearings).
+  Part 2  Fix: migration 013 adds hearings_hearing_date_idx. The cause list
+          at scale 1000, rerun on a fresh branch in three states.
+
+###########################################################################
+# PART 1: FIRST RUN (before migration 013)
+###########################################################################
+
 =================== scale 1 | case_list | WITHOUT indexes ===================
 dropped: none
 Execution Time per run: 1: 0.068 ms, 2: 0.081 ms, 3: 0.062 ms, 4: 0.046 ms, 5: 0.062 ms
@@ -948,3 +959,157 @@ Planning:
   Buffers: shared hit=22
 Planning Time: 0.406 ms
 Execution Time: 52.303 ms
+
+###########################################################################
+# PART 2: FIX (migration 013: hearings_hearing_date_idx)
+#
+# Rerun on a second throwaway branch, "migration-013-test" (copied from
+# production after 013, cloned 1000x the same way, since deleted). The three
+# states ran in one transaction, one after another:
+#   1  no indexes                 every index the plan uses removed
+#   2  before 013                 the court and case-type indexes, no date index
+#                                 (the "WITH indexes" state of Part 1)
+#   3  after 013                  all indexes, including hearings_hearing_date_idx
+#
+# Note: Part 1 measured state 2 at 0.84x of state 1; this rerun measured it at
+# 1.13x. In both, the plan reads all 527,527 hearings (Parallel Seq Scan on
+# hearings, Rows Removed by Filter: 175509 per worker, 4467 buffers), which is
+# most of the time either way. The court index only changes the join around
+# that scan, so it does not reliably help or hurt. The date index removes the
+# scan: 1001 hearings read, 1004 buffers.
+###########################################################################
+
+=================== scale 1000 | cause_list | 1 no indexes ===================
+indexes absent: case_types_code_key, cases_court_id_idx, hearings_hearing_date_idx
+Execution Time per run: 1: 75.268 ms, 2: 64.520 ms, 3: 66.288 ms, 4: 65.988 ms, 5: 70.140 ms
+median run: 3
+
+Gather Merge  (cost=9532.51..9544.74 rows=105 width=91) (actual time=61.557..66.103 rows=1001.00 loops=1)
+  Workers Planned: 2
+  Workers Launched: 2
+  Buffers: shared hit=7519
+  ->  Sort  (cost=8532.49..8532.60 rows=44 width=91) (actual time=45.453..45.496 rows=333.67 loops=3)
+        Sort Key: ct.code, c.case_year, c.case_number
+        Sort Method: quicksort  Memory: 60kB
+        Buffers: shared hit=7519
+        Worker 0:  Sort Method: quicksort  Memory: 40kB
+        Worker 1:  Sort Method: quicksort  Memory: 44kB
+        ->  Hash Join  (cost=1.45..8531.29 rows=44 width=91) (actual time=0.140..45.140 rows=333.67 loops=3)
+              Hash Cond: (c.case_type_id = ct.id)
+              Buffers: shared hit=7475
+              ->  Nested Loop  (cost=0.29..8529.07 rows=44 width=63) (actual time=0.096..44.870 rows=333.67 loops=3)
+                    Buffers: shared hit=7472
+                    ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=414 width=53) (actual time=0.044..40.932 rows=333.67 loops=3)
+                          Filter: (hearing_date = '2024-10-31'::date)
+                          Rows Removed by Filter: 175509
+                          Buffers: shared hit=4467
+                    ->  Index Scan using cases_pkey on cases c  (cost=0.29..3.18 rows=1 width=26) (actual time=0.011..0.011 rows=1.00 loops=1001)
+                          Index Cond: (id = h.case_id)
+                          Filter: (court_id = 6)
+                          Index Searches: 1001
+                          Buffers: shared hit=3005
+              ->  Hash  (cost=1.07..1.07 rows=7 width=12) (actual time=0.023..0.046 rows=7.00 loops=3)
+                    Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                    Buffers: shared hit=3
+                    ->  Seq Scan on case_types ct  (cost=0.00..1.07 rows=7 width=12) (actual time=0.016..0.040 rows=7.00 loops=3)
+                          Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=24
+Planning Time: 0.986 ms
+Execution Time: 66.288 ms
+
+=================== scale 1000 | cause_list | 2 before 013 (court + code indexes) ===================
+indexes absent: hearings_hearing_date_idx
+Execution Time per run: 1: 64.272 ms, 2: 58.604 ms, 3: 57.941 ms, 4: 57.920 ms, 5: 59.332 ms
+median run: 2
+
+Incremental Sort  (cost=2881.91..9100.80 rows=105 width=91) (actual time=55.301..58.445 rows=1001.00 loops=1)
+  Sort Key: ct.code, c.case_year, c.case_number
+  Presorted Key: ct.code
+  Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB
+  Pre-sorted Groups: 1  Sort Method: quicksort  Average Memory: 95kB  Peak Memory: 95kB
+  Buffers: shared hit=6370
+  ->  Nested Loop  (cost=1845.68..9097.29 rows=105 width=91) (actual time=53.787..57.509 rows=1001.00 loops=1)
+        Join Filter: (c.case_type_id = ct.id)
+        Rows Removed by Join Filter: 6006
+        Buffers: shared hit=6370
+        ->  Index Scan using case_types_code_key on case_types ct  (cost=0.13..12.24 rows=7 width=12) (actual time=0.005..0.017 rows=7.00 loops=1)
+              Index Searches: 1
+              Buffers: shared hit=2
+        ->  Materialize  (cost=1845.54..9072.19 rows=105 width=63) (actual time=1.094..8.092 rows=1001.00 loops=7)
+              Storage: Memory  Maximum Storage: 87kB
+              Buffers: shared hit=6368
+              ->  Gather  (cost=1845.54..9071.67 rows=105 width=63) (actual time=7.653..56.143 rows=1001.00 loops=1)
+                    Workers Planned: 2
+                    Workers Launched: 2
+                    Buffers: shared hit=6368
+                    ->  Hash Join  (cost=845.54..8061.17 rows=44 width=63) (actual time=7.767..42.333 rows=333.67 loops=3)
+                          Hash Cond: (h.case_id = c.id)
+                          Buffers: shared hit=6368
+                          ->  Parallel Seq Scan on hearings h  (cost=0.00..7214.54 rows=414 width=53) (actual time=0.024..34.411 rows=333.67 loops=3)
+                                Filter: (hearing_date = '2024-10-31'::date)
+                                Rows Removed by Filter: 175509
+                                Buffers: shared hit=4467
+                          ->  Hash  (cost=770.26..770.26 rows=6023 width=26) (actual time=7.723..7.724 rows=6006.00 loops=3)
+                                Buckets: 8192  Batches: 1  Memory Usage: 440kB
+                                Buffers: shared hit=1901
+                                ->  Bitmap Heap Scan on cases c  (cost=70.97..770.26 rows=6023 width=26) (actual time=0.221..5.388 rows=6006.00 loops=3)
+                                      Recheck Cond: (court_id = 6)
+                                      Heap Blocks: exact=624
+                                      Buffers: shared hit=1901
+                                      ->  Bitmap Index Scan on cases_court_id_idx  (cost=0.00..69.46 rows=6023 width=0) (actual time=0.161..0.161 rows=6006.00 loops=3)
+                                            Index Cond: (court_id = 6)
+                                            Index Searches: 3
+                                            Buffers: shared hit=29
+Planning:
+  Buffers: shared hit=24
+Planning Time: 0.664 ms
+Execution Time: 58.604 ms
+
+=================== scale 1000 | cause_list | 3 after 013 (all indexes) ===================
+indexes absent: none
+Execution Time per run: 1: 7.432 ms, 2: 5.859 ms, 3: 5.624 ms, 4: 5.344 ms, 5: 5.611 ms
+median run: 3
+
+Incremental Sort  (cost=2592.33..3230.33 rows=105 width=91) (actual time=5.428..5.477 rows=1001.00 loops=1)
+  Sort Key: ct.code, c.case_year, c.case_number
+  Presorted Key: ct.code
+  Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB
+  Pre-sorted Groups: 1  Sort Method: quicksort  Average Memory: 95kB  Peak Memory: 95kB
+  Buffers: shared hit=1637
+  ->  Nested Loop  (cost=2486.24..3226.83 rows=105 width=91) (actual time=4.529..5.122 rows=1001.00 loops=1)
+        Join Filter: (c.case_type_id = ct.id)
+        Rows Removed by Join Filter: 6006
+        Buffers: shared hit=1637
+        ->  Index Scan using case_types_code_key on case_types ct  (cost=0.13..12.24 rows=7 width=12) (actual time=0.004..0.009 rows=7.00 loops=1)
+              Index Searches: 1
+              Buffers: shared hit=2
+        ->  Materialize  (cost=2486.10..3201.73 rows=105 width=63) (actual time=0.266..0.608 rows=1001.00 loops=7)
+              Storage: Memory  Maximum Storage: 87kB
+              Buffers: shared hit=1635
+              ->  Hash Join  (cost=2486.10..3201.20 rows=105 width=63) (actual time=1.862..3.668 rows=1001.00 loops=1)
+                    Hash Cond: (c.id = h.case_id)
+                    Buffers: shared hit=1635
+                    ->  Bitmap Heap Scan on cases c  (cost=70.97..770.26 rows=6023 width=26) (actual time=0.182..1.290 rows=6006.00 loops=1)
+                          Recheck Cond: (court_id = 6)
+                          Heap Blocks: exact=624
+                          Buffers: shared hit=631
+                          ->  Bitmap Index Scan on cases_court_id_idx  (cost=0.00..69.46 rows=6023 width=0) (actual time=0.126..0.126 rows=6006.00 loops=1)
+                                Index Cond: (court_id = 6)
+                                Index Searches: 1
+                                Buffers: shared hit=7
+                    ->  Hash  (cost=2402.71..2402.71 rows=994 width=53) (actual time=1.672..1.673 rows=1001.00 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 63kB
+                          Buffers: shared hit=1004
+                          ->  Bitmap Heap Scan on hearings h  (cost=12.13..2402.71 rows=994 width=53) (actual time=0.159..1.490 rows=1001.00 loops=1)
+                                Recheck Cond: (hearing_date = '2024-10-31'::date)
+                                Heap Blocks: exact=1001
+                                Buffers: shared hit=1004
+                                ->  Bitmap Index Scan on hearings_hearing_date_idx  (cost=0.00..11.88 rows=994 width=0) (actual time=0.069..0.069 rows=1001.00 loops=1)
+                                      Index Cond: (hearing_date = '2024-10-31'::date)
+                                      Index Searches: 1
+                                      Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=24
+Planning Time: 0.674 ms
+Execution Time: 5.624 ms
