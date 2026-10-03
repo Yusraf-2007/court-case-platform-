@@ -24,6 +24,8 @@ as every new migration.
 - [x] CREATE VIEW: 001 (`usable_limitation_rules`)
 - [ ] CREATE FUNCTION
 - [ ] CREATE TRIGGER
+  - [ ] planned for 006: FIR only on G.R. cases (`cases.fir_id` must be
+        NULL unless the case type is G.R.)
 
 ### DML
 
