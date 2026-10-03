@@ -17,7 +17,7 @@ as every new migration.
 ### DDL
 
 - [x] CREATE TABLE: 001
-- [ ] CREATE TYPE
+- [x] CREATE TYPE: 004 (six enums)
 - [ ] ALTER TABLE
 - [ ] DROP
 - [x] CREATE INDEX: 001 (including a partial unique index)
