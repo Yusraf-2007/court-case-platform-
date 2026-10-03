@@ -14,12 +14,13 @@
 --
 -- ===========================================================================
 -- KNOWN GAPS
---   1. Case 55 converted_to is NOT seeded. Its court number is still not
---      stated, and the conversion needs two case rows (C.C. 112/2023 and
---      N.I. Act 240/2024); the status of the old C.C. row is not stated.
---   2. Case 53 stayed_by is NOT seeded. Its target, Cr. Misc. 3300/2023 in
---      the Patna High Court, is not a case in the dataset and there is no
---      High Court Cr. Misc. case type.
+--   1. Case 55 converted_to is NOT seeded here (resolved in 007). Its court
+--      number is not stated, and the conversion needs two case rows
+--      (C.C. 112/2023 and N.I. Act 240/2024); the old row's status is not
+--      stated.
+--   2. Case 53 stayed_by is NOT seeded here (resolved in 007). Its target,
+--      Cr. Misc. 3300/2023 in the Patna High Court, is not a case in the
+--      dataset and there is no High Court Cr. Misc. case type.
 --   3. Case 51 transferred_to is NOT seeded. DOMAIN.md gives no target case:
 --      a transfer is a court_id update plus an audit-log row (implication 5).
 --   4. Cases 9, 10 and 19 list tagged_with -> Case 20, while Case 20 lists
@@ -52,7 +53,8 @@ CREATE TABLE case_relationships (
     CONSTRAINT case_relationships_unique_edge  UNIQUE (from_case_id, to_case_id, rel_type)
 );
 
--- The graph is traversed in both directions.
+-- The graph is traversed in both directions. (The from_case_id index is
+-- dropped in 007: the unique constraint already covers it.)
 CREATE INDEX case_relationships_from_case_id_idx ON case_relationships (from_case_id);
 CREATE INDEX case_relationships_to_case_id_idx   ON case_relationships (to_case_id);
 
