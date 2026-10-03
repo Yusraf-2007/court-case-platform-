@@ -93,8 +93,11 @@ FIRs registered before 1 July 2024 carry IPC sections; those after carry
 BNS sections. The dataset below reflects this deliberately, because it is a
 real complication the schema must handle: the `provisions` table needs an
 `act_name` column and cases filed across the boundary may cite sections from
-both statutes. Cases 1â€“5, 9, 13, 22â€“23, 27, 31â€“38 and 47â€“50 use IPC. Cases
-20, 24, 25, 28, 29 and 41â€“46 use BNS.
+both statutes. Cases 1-5, 7, 8, 30, 31, 34, 35, 38-40, 44 and 47-53 cite
+IPC. Cases 9, 20, 29, 32, 33, 36 and 37 cite BNS. No case cites both. The
+remaining cases cite no IPC or BNS section: the N.I. Act cases, the appellate
+and revisional matters, the Misc. applications, and Cases 10 and 19 (which
+share Case 9's FIR but list no sections of their own).
 
 ---
 
