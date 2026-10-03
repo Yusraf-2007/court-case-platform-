@@ -23,6 +23,9 @@
 --   5. Case 1 is seeded as "disposed / conviction", as its entry states,
 --      although Case 12 remanded it on 22-08-2026. Case 7 is seeded as
 --      pending at defence evidence, as its entry states ("reopened on remand").
+--      The two remands are modelled differently ON PURPOSE: Case 7 reopened,
+--      Case 1 did not. Both carry a remanded_to edge, so the recursive
+--      family-tree query is tested against both shapes.
 --   6. Case 51 is seeded in JMFC Court No. 7, its current court. The transfer
 --      from Court No. 3 (14-06-2023) belongs in case_audit_log (not yet built).
 --   7. No FIR is stated for G.R. Cases 39, 40, 47, 49, 50. Case 20 (C.C.)
