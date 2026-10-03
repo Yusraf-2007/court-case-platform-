@@ -254,6 +254,10 @@ weakened data integrity.
   in one run and 1.13x in another, on different branch computes. Differences
   under about 1.2x should be read as noise. The 244x, 335x and 10.4x results
   are far outside that range.
+- **The case list query has since changed.** After these measurements,
+  `case_list.sql` gained optional filters, pagination and a total count
+  (`count(*) OVER ()`) to serve the `/cases` page. The figures above are for
+  the earlier version, which took all three filters and no page limit.
 - **Execution time only.** Planning time and network latency are excluded by
   design. They are the same with and without indexes, and would dilute the
   comparison.

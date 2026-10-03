@@ -15,6 +15,20 @@
 - Seed only what `DOMAIN.md` states. Anything unstated goes in a KNOWN GAPS
   comment block in the migration, not into the data.
 
+## Web app
+
+- Next.js 15 (App Router, `src/`), TypeScript, Tailwind v4, shadcn/ui
+  (`components.json`; components live in `src/components/ui`).
+- Database access: the `postgres` package via `src/lib/db.ts`, reading
+  `DATABASE_URL`. No ORM.
+- Every value from a request goes to Postgres as a bound parameter: tagged
+  templates (`sql\`...${v}\``) or `sql.unsafe(fileText, [values])` with `$n`
+  placeholders. Never build SQL text from request data.
+- Shared queries live in `db/queries/*.sql` and are read at runtime; list each
+  route that reads them in `outputFileTracingIncludes` in `next.config.ts`.
+- Validate search params against known values before they reach a query
+  (see `parseFilters` in `src/lib/cases.ts`).
+
 ## SQL coverage
 
 Tracks which SQL command categories the project uses, for the report. Counts

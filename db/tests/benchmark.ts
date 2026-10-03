@@ -39,7 +39,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const queriesDir = join(here, "..", "queries");
 const outputFile = join(here, "explain_output.txt");
 
-type Params = Record<string, string | number>;
+// Named psql variables (:name, :'name') or positional parameters ($1, $2...).
+type Value = string | number | null;
+type Params = Record<string, Value> | Value[];
 type Bench = { name: string; file: string; params: Params };
 type Droppable = {
   index: string;
@@ -65,10 +67,23 @@ if (url.includes(PRODUCTION_ENDPOINT)) {
 }
 const scale = parseScale(process.argv.slice(2));
 
-// Replace psql variables (:name and :'name') with literals. Only the given
-// names are touched, so casts like ::text are left alone.
+function literal(value: Value): string {
+  if (value === null) return "NULL";
+  return typeof value === "number" ? String(value) : `'${value.replace(/'/g, "''")}'`;
+}
+
+// Inline the parameters as literals so EXPLAIN can run the query as text.
+// Positional: $1, $2... (highest first, so $1 never matches inside $10).
+// Named: psql variables :name and :'name'; only the given names are touched,
+// so casts like ::text are left alone.
 function bind(sql: string, params: Params): string {
   let out = sql;
+  if (Array.isArray(params)) {
+    for (let i = params.length; i >= 1; i--) {
+      out = out.replace(new RegExp(`\\$${i}(?!\\d)`, "g"), literal(params[i - 1]));
+    }
+    return out.trim().replace(/;\s*$/, "");
+  }
   for (const [name, value] of Object.entries(params)) {
     const quoted = `'${String(value).replace(/'/g, "''")}'`;
     out = out.replaceAll(`:'${name}'`, quoted);
@@ -139,10 +154,11 @@ async function cloneDataset(db: pg.Client, copies: number): Promise<void> {
 // ---------------------------------------------------------------------------
 // Index discovery
 // ---------------------------------------------------------------------------
-function indexNames(plan: any, found = new Set<string>()): Set<string> {
+function indexNames(plan: unknown, found = new Set<string>()): Set<string> {
   if (plan && typeof plan === "object") {
-    if (typeof plan["Index Name"] === "string") found.add(plan["Index Name"]);
-    for (const v of Object.values(plan)) indexNames(v, found);
+    const node = plan as Record<string, unknown>;
+    if (typeof node["Index Name"] === "string") found.add(node["Index Name"]);
+    for (const v of Object.values(node)) indexNames(v, found);
   }
   return found;
 }
@@ -189,8 +205,8 @@ async function explainRuns(db: pg.Client, sql: string, label: string, log: strin
   const times: number[] = [];
   let rows = 0;
   for (let run = 1; run <= RUNS; run++) {
-    const res = await db.query(`EXPLAIN ANALYZE ${sql}`);
-    const lines: string[] = res.rows.map((r: any) => r["QUERY PLAN"]);
+    const res = await db.query<{ "QUERY PLAN": string }>(`EXPLAIN ANALYZE ${sql}`);
+    const lines = res.rows.map((r) => r["QUERY PLAN"]);
     log.push(`--- ${label}, run ${run} ---`, ...lines, "");
     const exec = lines.find((l) => l.startsWith("Execution Time:"));
     times.push(Number(exec?.match(/([\d.]+) ms/)?.[1]));
@@ -219,7 +235,8 @@ const { case_1, court_3 } = ids.rows[0];
 
 const benches: Bench[] = [
   { name: "case list (court, stage, status)", file: "case_list.sql",
-    params: { court_id: court_3, stage: "prosecution_evidence", status: "pending" } },
+    // court, case type, stage, status, page size (NULL = all), offset
+    params: [court_3, null, "prosecution_evidence", "pending", null, 0] },
   { name: "case_family (Case 1)", file: "case_family.sql", params: { case_id: case_1 } },
   { name: "case_timeline (Case 1)", file: "case_timeline.sql", params: { case_id: case_1 } },
   { name: "adjournment_analysis", file: "adjournment_analysis.sql", params: {} },
