@@ -95,10 +95,14 @@ CREATE TABLE cases (
     -- district, this key needs court_id's district (court_id itself cannot
     -- be used: a transfer changes it).
     UNIQUE (case_type_id, case_number, case_year),
-    CHECK ((status = 'disposed') = (disposed_on IS NOT NULL)),
-    CHECK ((status = 'disposed') = (disposal_mode IS NOT NULL)),
-    CHECK (registered_on IS NULL OR registered_on >= filed_on),
-    CHECK (disposed_on IS NULL OR disposed_on >= filed_on)
+    CONSTRAINT cases_disposed_on_matches_status
+        CHECK ((status = 'disposed') = (disposed_on IS NOT NULL)),
+    CONSTRAINT cases_disposal_mode_matches_status
+        CHECK ((status = 'disposed') = (disposal_mode IS NOT NULL)),
+    CONSTRAINT cases_registered_on_after_filed_on
+        CHECK (registered_on IS NULL OR registered_on >= filed_on),
+    CONSTRAINT cases_disposed_on_after_filed_on
+        CHECK (disposed_on IS NULL OR disposed_on >= filed_on)
 );
 
 CREATE INDEX cases_court_id_idx ON cases (court_id);
