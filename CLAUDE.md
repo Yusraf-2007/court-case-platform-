@@ -18,7 +18,7 @@ as every new migration.
 
 - [x] CREATE TABLE: 001
 - [x] CREATE TYPE: 004 (six enums)
-- [ ] ALTER TABLE
+- [x] ALTER TABLE: 005 (`filed_on`, `stage` made nullable)
 - [ ] DROP
 - [x] CREATE INDEX: 001 (including a partial unique index)
 - [x] CREATE VIEW: 001 (`usable_limitation_rules`)
