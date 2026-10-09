@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/cases": ["./db/queries/**/*.sql"],
     "/cases/[id]": ["./db/queries/**/*.sql"],
+    "/cases/[id]/edit": ["./db/queries/**/*.sql"],
+    "/cases/new": ["./db/queries/**/*.sql"],
   },
 };
 

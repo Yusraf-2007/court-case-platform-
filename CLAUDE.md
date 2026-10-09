@@ -35,6 +35,26 @@
   - Use `?sslmode=require` in the URL. postgres.js passes unknown URL
     parameters (such as Neon's `channel_binding`) to the server, which rejects
     them.
+- Auth (migration 015): JWT (HS256, `jose`) in an httpOnly, SameSite=Lax
+  cookie, 8-hour expiry, signed with `JWT_SECRET`. Roles: `viewer` (default
+  for new users) and `admin`.
+  - Users live in schema `app_auth`; passwords are bcrypt-hashed in the
+    database. `app_readonly`/`app_web`/`app_admin` cannot read
+    `app_auth.users`. The app calls only `app_auth.authenticate()` (returns
+    id, name, role, never the hash) and `app_auth.current_role_of()`.
+  - Create users with `db/scripts/create_user.sql` as the owner; reset with
+    `SELECT app_auth.set_password(...)`. Never put passwords in migrations.
+  - Three checks guard writes: middleware (`src/middleware.ts`) blocks
+    anonymous requests and non-admins on `/cases/new` and `/cases/*/edit`;
+    each page and server action re-checks (`src/lib/auth.ts`); and
+    `requireAdmin()` re-reads the role from the database, so demoting or
+    disabling a user stops their writes immediately.
+  - Admin writes use `adminDb()` (`ADMIN_DATABASE_URL`, login `app_admin`:
+    INSERT/UPDATE on `cases` only, plus the audit inserts its triggers make).
+    Each write transaction sets `app.user`, which the audit triggers record in
+    `case_audit_log.changed_by`.
+  - The future text-to-SQL layer must get its own login without USAGE on
+    `app_auth`, so it cannot call `authenticate()`.
 - Every value from a request goes to Postgres as a bound parameter: tagged
   templates (`sql\`...${v}\``) or `sql.unsafe(fileText, [values])` with `$n`
   placeholders. Never build SQL text from request data.
@@ -81,8 +101,8 @@ or script.
 
 ### DCL
 
-- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`)
-- [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`)
+- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`); 015 (`app_admin`: INSERT/UPDATE on `cases`; EXECUTE on `app_auth` functions to `app_web`)
+- [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`); 015 (EXECUTE on `app_auth` functions from PUBLIC)
 
 ### TCL
 

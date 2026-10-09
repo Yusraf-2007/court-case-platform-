@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, PencilIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireUser } from "@/lib/auth";
 import { getCase, parseCaseId } from "@/lib/case-detail";
 import { formatDate, humanize, statusVariant } from "@/lib/format";
 
@@ -39,6 +41,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 const notRecorded = <span className="text-muted-foreground">Not recorded</span>;
 
 export default async function CasePage({ params }: Props) {
+  const session = await requireUser();
   const data = await loadCase((await params).id);
   if (!data) notFound();
   const { detail: c, timeline, parties, sections } = data;
@@ -56,6 +59,13 @@ export default async function CasePage({ params }: Props) {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{c.case_no}</h1>
           <Badge variant={statusVariant[c.status] ?? "outline"}>{humanize(c.status)}</Badge>
+          {session.role === "admin" ? (
+            <Button asChild variant="outline" size="sm" className="ml-auto">
+              <Link href={`/cases/${c.id}/edit`}>
+                <PencilIcon /> Edit
+              </Link>
+            </Button>
+          ) : null}
         </div>
         <p className="text-muted-foreground text-sm">
           {c.case_type_name} · {c.court}

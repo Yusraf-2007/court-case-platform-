@@ -7,13 +7,14 @@ a Next.js 15 web app.
 
 ```sh
 npm install
-cp .env.example .env.local   # then set DATABASE_URL
+cp .env.example .env.local   # then set DATABASE_URL, ADMIN_DATABASE_URL, JWT_SECRET
 npm run dev                  # http://localhost:3000/cases
 ```
 
 ## Layout
 
-- `db/migrations/`: the schema and seed data, applied in order (001-013)
+- `db/migrations/`: the schema and seed data, applied in order (001-015)
 - `db/queries/`: SQL shared by the app, psql and the benchmark
 - `db/tests/`: integrity test (psql) and index benchmark, with results
-- `src/`: the web app (`/cases`: paginated, server-side filtered case list)
+- `db/scripts/create_user.sql`: add a user (viewer by default, `-v role=admin` for admin)
+- `src/`: the web app. Sign in at `/login`; viewers browse `/cases`, admins can also add and edit cases.
