@@ -2,7 +2,7 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { db } from "@/lib/db";
+import { readDb as db } from "@/lib/db-read";
 
 // Shared queries live in db/queries/*.sql so the app, psql and the benchmark
 // all run the same SQL. Each file is read once per server process.
@@ -17,7 +17,7 @@ function queryText(name: string): string {
   return text;
 }
 
-type Param = string | number | null;
+type Param = string | number | boolean | null;
 
 // Run db/queries/<name>.sql with positional parameters ($1, $2, ...).
 // sql.unsafe() means only that the SQL *text* is not a tagged template: it is

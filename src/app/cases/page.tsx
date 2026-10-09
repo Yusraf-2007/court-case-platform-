@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PAGE_SIZE, getFilterOptions, listCases, parseFilters, type CaseFilters } from "@/lib/cases";
+import { getSession } from "@/lib/auth";
 import { formatDate, humanize, statusVariant } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Cases" };
@@ -40,8 +41,10 @@ export default async function CasesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const session = await getSession();
+  const params = await searchParams;
   const options = await getFilterOptions();
-  const filters = parseFilters(await searchParams, options);
+  const filters = parseFilters(params, options);
   const { rows, total } = await listCases(filters);
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -53,11 +56,20 @@ export default async function CasesPage({
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Cases</h1>
-        <p className="text-muted-foreground text-sm">
-          Criminal cases across the Begusarai courts and their appellate forums.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Cases</h1>
+          <p className="text-muted-foreground text-sm">
+            Criminal cases across the Begusarai courts and their appellate forums.
+          </p>
+        </div>
+        {session?.role === "admin" ? (
+          <Button asChild>
+            <Link href="/admin/cases/new">
+              <PlusIcon /> New case
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       <Card>

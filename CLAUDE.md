@@ -19,8 +19,14 @@
 
 - Next.js 15 (App Router, `src/`), TypeScript, Tailwind v4, shadcn/ui
   (`components.json`; components live in `src/components/ui`).
-- Database access: the `postgres` package via `src/lib/db.ts`, reading
-  `DATABASE_URL`. No ORM.
+- Database access: the `postgres` package, no ORM, through two connections:
+  - `src/lib/db-read.ts` (`readDb()`, `DATABASE_URL`, login `app_web`): every
+    public page and every read.
+  - `src/lib/db-write.ts` (`writeDb(admin, fn)`, `ADMIN_DATABASE_URL`, login
+    `app_admin_user`, migration 017): writes only. It takes an
+    `AdminSession`, a branded type that only `requireAdmin()` and
+    `authenticateAdmin()` in `src/lib/auth.ts` can produce, so code outside
+    an authenticated admin handler cannot open a write transaction.
 - The app connects as `app_web` (migration 014), never as `neondb_owner`.
   `app_web` holds only `app_readonly`'s rights (012): SELECT on every table,
   no INSERT/UPDATE/DELETE/TRUNCATE, no CREATE. Every session also defaults to
@@ -35,6 +41,30 @@
   - Use `?sslmode=require` in the URL. postgres.js passes unknown URL
     parameters (such as Neon's `channel_binding`) to the server, which rejects
     them.
+- Auth (migrations 015, 018): public pages (`/`, `/cases`, `/cases/[id]`,
+  `/search`, `/deadlines`) need no login. Only admins sign in, at `/login`,
+  with a username or an email. JWT (HS256, `jose`) in an httpOnly, Secure,
+  SameSite=Lax cookie, 8-hour expiry, signed with `JWT_SECRET` (32+ chars).
+  - The `viewer` role (the default for new users) is kept but unused: it is
+    reserved for a future litigant portal. A viewer cannot sign in today.
+  - Users live in schema `app_auth`; passwords are bcrypt-hashed in the
+    database. No app role can read `app_auth.users`. The app calls only
+    `app_auth.authenticate()` (returns id, name, role, never the hash),
+    `app_auth.current_role_of()` and, via the write connection,
+    `app_auth.record_login()`.
+  - Create users with `db/scripts/create_user.sql` as the owner; reset with
+    `SELECT app_auth.set_password(...)` and `app_auth.set_email(...)`. Never
+    put passwords in migrations.
+  - Three checks guard `/admin`: middleware (`src/middleware.ts`) redirects
+    anyone without an admin session; each page and server action calls
+    `requireAdmin()`; and `requireAdmin()` re-reads the role from the
+    database, so demoting or disabling a user ends their session at once.
+  - `app_admin` (017) is a NOLOGIN group with SELECT/INSERT/UPDATE/DELETE on
+    `public` tables, except `case_audit_log`, which is append-only.
+    `app_admin_user` is its login. Each write transaction sets `app.user`,
+    which the audit triggers record in `case_audit_log.changed_by`.
+  - The future text-to-SQL layer must get its own login without USAGE on
+    `app_auth`, so it cannot call `authenticate()`.
 - Every value from a request goes to Postgres as a bound parameter: tagged
   templates (`sql\`...${v}\``) or `sql.unsafe(fileText, [values])` with `$n`
   placeholders. Never build SQL text from request data.
@@ -42,6 +72,24 @@
   route that reads them in `outputFileTracingIncludes` in `next.config.ts`.
 - Validate search params against known values before they reach a query
   (see `parseFilters` in `src/lib/cases.ts`).
+- Archived cases (`cases.deleted_at`, migration 019) must never reach a
+  public page. Every public query filters `deleted_at IS NULL`; shared
+  queries that admin pages also use take an explicit parameter for it
+  (`case_list.sql` $7, `case_detail.sql` $2). Add the filter to any new
+  public query.
+- Admin area (`/admin`):
+  - Writes use `writeDbTracked()`, which returns a receipt: the triggers
+    that fired (each trigger function calls `note_trigger_fired(TG_NAME)`,
+    019) and the audit rows written. Actions redirect with the receipt in
+    the URL (`src/lib/admin/receipt.ts`); a new trigger needs an entry in
+    `TRIGGERS` there, and a new write needs an entry in `DONE`.
+  - Every table the admin area writes needs an `audit_row()` trigger (019).
+  - Parties, hearings and orders share one field-spec format
+    (`src/lib/admin/form-spec.ts`): the same specs render the form and drive
+    server-side validation (`validateFields`). Constraint and trigger names
+    map to field messages in `ERRORS` (`src/lib/admin/records.ts`).
+  - Deletes are refused while anything refers to the row, with counts;
+    archiving is the safe way to take a case off the public register.
 
 ## SQL coverage
 
@@ -55,13 +103,19 @@ or script.
 
 - [x] CREATE TABLE: 001
 - [x] CREATE TYPE: 004 (six enums)
-- [x] ALTER TABLE: 005 (`filed_on`, `stage` made nullable)
+- [x] ALTER TABLE: 005 (`filed_on`, `stage` made nullable); 019 (`ADD COLUMN`,
+      `DROP CONSTRAINT` of the audit log's FK)
   - also ALTER TYPE: 007 (`disposal_mode` gains `converted`)
-- [x] DROP: 007 (`DROP INDEX case_relationships_from_case_id_idx`)
-- [x] CREATE INDEX: 001 (including a partial unique index)
+- [x] DROP: 007 (`DROP INDEX case_relationships_from_case_id_idx`); 019
+      (`DROP TRIGGER`, to widen `hearings_not_after_disposal` to updates)
+- [x] CREATE INDEX: 001 (including a partial unique index); 019 (partial
+      index on `cases (deleted_at) WHERE deleted_at IS NULL`)
 - [x] CREATE VIEW: 001 (`usable_limitation_rules`)
-- [x] CREATE FUNCTION: 011 (five PL/pgSQL trigger functions)
-- [x] CREATE TRIGGER: 011 (status/stage audit, court audit, FIR only on
+- [x] CREATE FUNCTION: 011 (five PL/pgSQL trigger functions); 019 (generic
+      `audit_row()` driven by trigger arguments, and SQL function
+      `note_trigger_fired()`)
+- [x] CREATE TRIGGER: 019 (six `audit_row()` triggers, one function with
+      per-table arguments); 011 (status/stage audit, court audit, FIR only on
       G.R., no hearing after disposal, final order disposes case)
   - [ ] deferred: appeal-direction trigger, until the four
         `case_type_remedies` gaps in 001 are verified
@@ -70,19 +124,24 @@ or script.
 
 - [x] INSERT: 001 (including `INSERT ... SELECT`)
 - [x] UPDATE: 003
-- [x] DELETE: `scripts/clear_synthetic_hearings.sql`
+- [x] DELETE: `scripts/clear_synthetic_hearings.sql`; `tests/integrity_test.sql`
+      test 9 (a case delete keeps its audit history)
 - [x] SELECT: 001
   - [x] joins: 001 (`case_type_remedies` seed joins `case_types`)
   - [x] aggregates: `queries/adjournment_analysis.sql` (GROUP BY with
         `count(*)`, `count(*) FILTER`, and `sum(count(*)) OVER` for shares);
         window aggregates also in `queries/case_family.sql`
-  - [x] subqueries: 003 (scalar subquery in `UPDATE ... SET`)
+  - [x] subqueries: 003 (scalar subquery in `UPDATE ... SET`); `NOT EXISTS`
+        anti-join in `queries/pending_deadlines.sql`
   - [x] recursive CTE: `queries/case_family.sql`
+  - [x] set operations: `queries/case_stages.sql` (`UNION ALL` of case dates
+        and orders, then `DISTINCT ON` per stage; `LATERAL unnest` maps one
+        order to several stages)
 
 ### DCL
 
-- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`)
-- [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`)
+- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`); 015 (`app_admin`: INSERT/UPDATE on `cases`; EXECUTE on `app_auth` functions to `app_web`); 017 (`app_admin`: SELECT/INSERT/UPDATE/DELETE on `public`, `app_admin_user` IN ROLE `app_admin`); 018 (USAGE on `app_auth` and EXECUTE on `record_login` to `app_admin`)
+- [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`); 015 (EXECUTE on `app_auth` functions from PUBLIC); 017 (UPDATE, DELETE on `case_audit_log` from `app_admin`)
 
 ### TCL
 

@@ -17,5 +17,6 @@ FROM hearings h
 JOIN cases c       ON c.id = h.case_id
 JOIN case_types ct ON ct.id = c.case_type_id
 WHERE c.court_id     = :court_id
+  AND c.deleted_at IS NULL           -- archived cases are not listed (019)
   AND h.hearing_date = :'hearing_date'
 ORDER BY ct.code, c.case_year, c.case_number;

@@ -26,5 +26,6 @@ JOIN cases c       ON c.id = h.case_id
 JOIN courts co     ON co.id = c.court_id
 JOIN case_types ct ON ct.id = c.case_type_id
 WHERE h.outcome = 'adjourned'
+  AND c.deleted_at IS NULL          -- archived cases are left out (019)
 GROUP BY co.name, ct.code, h.adjournment_reason
 ORDER BY adjournments DESC, court, case_type, reason;

@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 
-import { db } from "@/lib/db";
+import { readDb as db } from "@/lib/db-read";
 import { runQuery } from "@/lib/queries";
 
 export const PAGE_SIZE = 20;
@@ -12,6 +12,9 @@ export type CaseFilters = {
   stage: string | null;
   status: string | null;
   page: number;
+  // Archived cases: public pages always use "live". Only parseFilters with
+  // { admin: true } reads another value from the URL.
+  archived: "live" | "all" | "archived";
 };
 
 export type CaseRow = {
@@ -22,6 +25,7 @@ export type CaseRow = {
   stage: string | null;
   status: string;
   filed_on: Date | null;
+  deleted_at: Date | null;
 };
 
 export type FilterOptions = {
@@ -61,6 +65,7 @@ function runCaseList(f: CaseFilters, limit: number, offset: number) {
     f.status,
     limit,
     offset,
+    f.archived,
   ]);
 }
 
@@ -81,6 +86,7 @@ export async function listCases(f: CaseFilters): Promise<{ rows: CaseRow[]; tota
       stage: r.stage,
       status: r.status,
       filed_on: r.filed_on,
+      deleted_at: r.deleted_at,
     })),
     total: rows.length ? Number(rows[0].total_count) : 0,
   };
@@ -91,6 +97,7 @@ export async function listCases(f: CaseFilters): Promise<{ rows: CaseRow[]; tota
 export function parseFilters(
   params: Record<string, string | string[] | undefined>,
   options: FilterOptions,
+  { admin = false }: { admin?: boolean } = {},
 ): CaseFilters {
   const one = (k: string) => {
     const v = params[k];
@@ -114,5 +121,6 @@ export function parseFilters(
     stage: member("stage", options.stages),
     status: member("status", options.statuses),
     page: Number.isInteger(page) && page >= 1 ? page : 1,
+    archived: admin ? ((member("archived", ["all", "archived"]) as "all" | "archived" | null) ?? "live") : "live",
   };
 }

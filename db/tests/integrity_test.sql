@@ -7,12 +7,16 @@
 -- Tests 1-7 try writes the schema must reject. Each passes only when the
 -- write is rejected AND the error names the expected rule, so a test cannot
 -- pass by failing for another reason.
--- Test 8 makes a write that must be accepted and checks what the trigger did.
+-- Tests 8-10 make writes that must be accepted and check what the triggers
+-- did. Test 11 checks privileges.
 --
 --   1-5  constraints (migrations 004, 006)
 --   6    trigger 3: FIR on a non-G.R. case            (migration 011)
 --   7    trigger 4: hearing after disposal             (migration 011)
 --   8    trigger 5 (and 1): final order disposes case  (migration 011)
+--   9    a deleted case keeps its audit history         (migration 019)
+--   10   archiving is logged                            (migration 019)
+--   11   the admin role cannot rewrite the audit log    (migrations 017, 019)
 --
 -- Usage (psql, needs psql 12+ for LAST_ERROR_MESSAGE):
 --   psql "$DATABASE_URL" -f db/tests/integrity_test.sql
@@ -168,6 +172,67 @@ INSERT INTO integrity_results
 SELECT 8, 'final order disposes of a pending case',
        'case disposed on order_date, change logged',
        :'t8_passed'::boolean, :'t8_detail';
+
+-- ---------------------------------------------------------------------------
+-- Test 9 (019): insert a case and delete it. Both writes must stay in
+-- case_audit_log after the case row is gone.
+-- ---------------------------------------------------------------------------
+SAVEPOINT test_9;
+WITH c AS (
+    INSERT INTO cases (case_type_id, case_number, case_year, court_id, registered_on, stage, status)
+    SELECT ct.id, 999009, 2026, co.id, DATE '2026-01-01', 'cognizance', 'pending'
+    FROM case_types ct, courts co
+    WHERE ct.code = 'CC' AND co.hierarchy_level = 1
+    LIMIT 1
+    RETURNING id
+)
+SELECT id AS t9_case FROM c \gset
+DELETE FROM cases WHERE id = :t9_case;
+\set t9_error :ERROR
+SELECT NOT :t9_error
+       AND NOT EXISTS (SELECT 1 FROM cases WHERE id = :t9_case)
+       AND (SELECT array_agg(action ORDER BY id) FROM case_audit_log
+            WHERE case_id = :t9_case AND table_name = 'cases') = ARRAY['insert', 'delete'] AS t9_passed,
+       (SELECT string_agg(action, ', ' ORDER BY id) FROM case_audit_log WHERE case_id = :t9_case) AS t9_detail
+\gset
+ROLLBACK TO SAVEPOINT test_9;
+INSERT INTO integrity_results
+SELECT 9, 'deleted case keeps its audit history', 'insert and delete rows remain in case_audit_log',
+       :'t9_passed'::boolean, 'audit rows: ' || :'t9_detail';
+
+-- ---------------------------------------------------------------------------
+-- Test 10 (019): archiving Case 1 (G.R. 412/2024) is logged.
+-- ---------------------------------------------------------------------------
+SAVEPOINT test_10;
+UPDATE cases c SET deleted_at = TIMESTAMPTZ '2026-10-01 10:00+05:30'
+FROM case_types ct
+WHERE ct.id = c.case_type_id AND (ct.code, c.case_number, c.case_year) = ('GR', 412, 2024);
+SELECT EXISTS (SELECT 1 FROM case_audit_log a
+               JOIN cases c ON c.id = a.case_id
+               JOIN case_types ct ON ct.id = c.case_type_id
+               WHERE (ct.code, c.case_number, c.case_year) = ('GR', 412, 2024)
+                 AND a.field_changed = 'deleted_at' AND a.old_value IS NULL
+                 AND a.new_value IS NOT NULL) AS t10_passed \gset
+ROLLBACK TO SAVEPOINT test_10;
+INSERT INTO integrity_results
+SELECT 10, 'archiving a case is logged', 'deleted_at change in case_audit_log',
+       :'t10_passed'::boolean, CASE WHEN :'t10_passed'::boolean THEN 'logged' ELSE 'no audit row' END;
+
+-- ---------------------------------------------------------------------------
+-- Test 11 (017, 019): the admin group may add to the audit log but never
+-- change or remove an entry.
+-- ---------------------------------------------------------------------------
+INSERT INTO integrity_results
+SELECT 11, 'admin role cannot rewrite the audit log', 'INSERT only: no UPDATE, DELETE or TRUNCATE',
+       has_table_privilege('app_admin', 'case_audit_log', 'INSERT')
+       AND NOT has_table_privilege('app_admin', 'case_audit_log', 'UPDATE')
+       AND NOT has_table_privilege('app_admin', 'case_audit_log', 'DELETE')
+       AND NOT has_table_privilege('app_admin', 'case_audit_log', 'TRUNCATE'),
+       format('insert=%s update=%s delete=%s truncate=%s',
+              has_table_privilege('app_admin', 'case_audit_log', 'INSERT'),
+              has_table_privilege('app_admin', 'case_audit_log', 'UPDATE'),
+              has_table_privilege('app_admin', 'case_audit_log', 'DELETE'),
+              has_table_privilege('app_admin', 'case_audit_log', 'TRUNCATE'));
 
 -- ---------------------------------------------------------------------------
 -- Report
