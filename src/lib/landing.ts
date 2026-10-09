@@ -15,10 +15,11 @@ export async function getLandingStats(): Promise<LandingStats> {
   const sql = readDb();
   const [[totals], levels] = await Promise.all([
     sql<Omit<LandingStats, "byLevel">[]>`
-      SELECT (SELECT count(*) FROM cases)::int                                AS cases,
+      SELECT (SELECT count(*) FROM cases WHERE deleted_at IS NULL)::int       AS cases,
              (SELECT count(*) FROM courts)::int                               AS courts,
              (SELECT count(DISTINCT state) FROM high_court_jurisdictions)::int AS states,
-             (SELECT count(*) FROM cases WHERE status = 'disposed')::int      AS disposed`,
+             (SELECT count(*) FROM cases
+               WHERE status = 'disposed' AND deleted_at IS NULL)::int         AS disposed`,
     sql<{ level: number; n: number }[]>`
       SELECT hierarchy_level AS level, count(*)::int AS n FROM courts GROUP BY hierarchy_level`,
   ]);

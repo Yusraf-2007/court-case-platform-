@@ -62,8 +62,8 @@ export default async function CasePage({ params }: Props) {
           <Badge variant={statusVariant[c.status] ?? "outline"}>{humanize(c.status)}</Badge>
           {session?.role === "admin" ? (
             <Button asChild variant="outline" size="sm" className="ml-auto">
-              <Link href={`/admin/cases/${c.id}/edit`}>
-                <PencilIcon /> Edit
+              <Link href={`/admin/cases/${c.id}`}>
+                <PencilIcon /> Manage
               </Link>
             </Button>
           ) : null}

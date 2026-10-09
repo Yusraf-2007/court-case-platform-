@@ -4,6 +4,8 @@
 --
 -- Parameters (positional, sent separately from the SQL text):
 --   $1  case id  bigint
+--   $2  include archived  boolean  (true only on admin pages; public pages
+--       pass false, so an archived case is not found)
 -- Used by the /cases/[id] page (src/lib/case-detail.ts). Returns no row for
 -- an unknown id.
 
@@ -21,6 +23,7 @@ SELECT c.id,
        c.filed_on,
        c.registered_on,
        c.disposed_on,
+       c.deleted_at,
        f.police_station   AS fir_police_station,
        f.fir_number,
        f.fir_year,
@@ -33,4 +36,5 @@ JOIN courts co                  ON co.id = c.court_id
 JOIN court_levels cl            ON cl.level = co.hierarchy_level
 LEFT JOIN firs f                ON f.id = c.fir_id
 LEFT JOIN case_listing_stats s  ON s.case_id = c.id
-WHERE c.id = $1::bigint;
+WHERE c.id = $1::bigint
+  AND (c.deleted_at IS NULL OR $2::boolean);

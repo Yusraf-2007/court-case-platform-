@@ -18,6 +18,7 @@ export type CaseDetail = {
   filed_on: Date | null;
   registered_on: Date | null;
   disposed_on: Date | null;
+  deleted_at: Date | null;
   fir_police_station: string | null;
   fir_number: number | null;
   fir_year: number | null;
@@ -62,9 +63,10 @@ export function parseCaseId(raw: string): number | null {
   return Number.isSafeInteger(id) ? id : null;
 }
 
-export async function getCase(id: number) {
+// Public pages never see an archived case; admin pages pass includeArchived.
+export async function getCase(id: number, { includeArchived = false }: { includeArchived?: boolean } = {}) {
   const [rows, timeline, parties, sections, stageEvents] = await Promise.all([
-    runQuery<CaseDetail>("case_detail", [id]),
+    runQuery<CaseDetail>("case_detail", [id, includeArchived]),
     runQuery<TimelineEntry>("case_timeline", [id]),
     runQuery<Party>("case_parties", [id]),
     runQuery<Section>("case_sections", [id]),

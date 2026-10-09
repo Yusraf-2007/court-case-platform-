@@ -4,7 +4,8 @@ import postgres from "postgres";
 import { getFilterOptions } from "@/lib/cases";
 import type { AdminSession } from "@/lib/auth";
 import { readDb as db } from "@/lib/db-read";
-import { writeDb } from "@/lib/db-write";
+import { countPhrases } from "@/lib/admin/records";
+import { writeDbTracked } from "@/lib/db-write";
 
 // ---------------------------------------------------------------------------
 // Form options and current values
@@ -148,19 +149,20 @@ export function validateCase(v: CaseFormValues, o: CaseFormOptions) {
 // Saving: through db-write.ts (app_admin_user), in one transaction that names
 // the admin, so the audit triggers record who changed status, stage or court.
 // ---------------------------------------------------------------------------
-export async function saveCase(admin: AdminSession, input: CaseInput, id: number | null): Promise<number | null> {
-  const rows = await writeDb(admin, async (sql) => {
+export async function saveCase(admin: AdminSession, input: CaseInput, id: number | null) {
+  return writeDbTracked(admin, async (sql) => {
     const v = input;
     if (id === null) {
-      return sql<{ id: string }[]>`
+      const [row] = await sql<{ id: string }[]>`
         INSERT INTO cases (case_type_id, case_number, case_year, court_id, fir_id, filed_on,
                            registered_on, stage, status, disposal_mode, disposed_on)
         VALUES (${v.case_type_id}, ${v.case_number}, ${v.case_year}, ${v.court_id}, ${v.fir_id},
                 ${v.filed_on}::date, ${v.registered_on}::date, ${v.stage}::case_stage,
                 ${v.status}::case_status, ${v.disposal_mode}::disposal_mode, ${v.disposed_on}::date)
         RETURNING id`;
+      return Number(row.id);
     }
-    return sql<{ id: string }[]>`
+    const rows = await sql<{ id: string }[]>`
       UPDATE cases SET
         case_type_id = ${v.case_type_id}, case_number = ${v.case_number}, case_year = ${v.case_year},
         court_id = ${v.court_id}, fir_id = ${v.fir_id},
@@ -169,8 +171,59 @@ export async function saveCase(admin: AdminSession, input: CaseInput, id: number
         disposal_mode = ${v.disposal_mode}::disposal_mode, disposed_on = ${v.disposed_on}::date
       WHERE id = ${id}
       RETURNING id`;
+    return rows.length ? Number(rows[0].id) : null;
   });
-  return rows.length ? Number(rows[0].id) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Archive, restore, delete
+// ---------------------------------------------------------------------------
+
+// Archiving hides a case from every public page and keeps everything.
+export function setArchived(admin: AdminSession, id: number, archived: boolean) {
+  return writeDbTracked(admin, async (sql) => {
+    const rows = archived
+      ? await sql`UPDATE cases SET deleted_at = now() WHERE id = ${id} AND deleted_at IS NULL`
+      : await sql`UPDATE cases SET deleted_at = NULL WHERE id = ${id} AND deleted_at IS NOT NULL`;
+    return rows.count > 0;
+  });
+}
+
+// Everything that refers to a case, except its audit history (which
+// survives deletion, migration 019). A case is deleted only when this is
+// empty; otherwise the admin is told what is in the way.
+export async function caseDependents(id: number): Promise<string[]> {
+  const [r] = await db()<Record<string, number>[]>`
+    SELECT (SELECT count(*)::int FROM case_parties             WHERE case_id = ${id}) AS party,
+           (SELECT count(*)::int FROM hearings                 WHERE case_id = ${id}) AS hearing,
+           (SELECT count(*)::int FROM orders                   WHERE case_id = ${id}) AS "order",
+           (SELECT count(*)::int FROM case_provisions          WHERE case_id = ${id}) AS section,
+           (SELECT count(*)::int FROM witnesses                WHERE case_id = ${id}) AS witness,
+           (SELECT count(*)::int FROM case_relationships
+             WHERE from_case_id = ${id} OR to_case_id = ${id})                       AS case_link,
+           (SELECT count(*)::int FROM case_listing_stats       WHERE case_id = ${id}) AS listing_record,
+           (SELECT count(*)::int FROM case_adjournment_reasons WHERE case_id = ${id}) AS adjournment_record`;
+  return countPhrases(r);
+}
+
+// Deletes only a case with nothing depending on it. The count is taken again
+// inside the write transaction, and the foreign keys refuse a delete that
+// races with a new hearing or order.
+export function deleteCase(admin: AdminSession, id: number) {
+  return writeDbTracked(admin, async (sql) => {
+    const [r] = await sql<{ blocked: boolean }[]>`
+      SELECT EXISTS (SELECT 1 FROM case_parties WHERE case_id = ${id})
+          OR EXISTS (SELECT 1 FROM hearings WHERE case_id = ${id})
+          OR EXISTS (SELECT 1 FROM orders WHERE case_id = ${id})
+          OR EXISTS (SELECT 1 FROM case_provisions WHERE case_id = ${id})
+          OR EXISTS (SELECT 1 FROM witnesses WHERE case_id = ${id})
+          OR EXISTS (SELECT 1 FROM case_relationships WHERE from_case_id = ${id} OR to_case_id = ${id})
+          OR EXISTS (SELECT 1 FROM case_listing_stats WHERE case_id = ${id})
+          OR EXISTS (SELECT 1 FROM case_adjournment_reasons WHERE case_id = ${id}) AS blocked`;
+    if (r.blocked) return "blocked" as const;
+    const rows = await sql`DELETE FROM cases WHERE id = ${id}`;
+    return rows.count > 0 ? ("deleted" as const) : ("missing" as const);
+  });
 }
 
 // The schema enforces the case rules with named constraints and triggers

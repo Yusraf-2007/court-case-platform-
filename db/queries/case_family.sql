@@ -32,11 +32,16 @@ edges AS (
     SELECT to_case_id, from_case_id, rel_type, 'reverse'
     FROM case_relationships
 ),
+live AS (
+    -- Archived cases (019) are not walked to or through.
+    SELECT id FROM cases WHERE deleted_at IS NULL
+),
 family (case_id, depth, rel_type, direction, path) AS (
     -- Anchor: the starting case.
     SELECT c.id, 0, NULL::rel_type, NULL::text, ARRAY[c.id]
     FROM cases c
     WHERE c.id = :case_id
+      AND c.deleted_at IS NULL
 
     UNION ALL
 
@@ -44,6 +49,7 @@ family (case_id, depth, rel_type, direction, path) AS (
     SELECT e.dst, f.depth + 1, e.rel_type, e.direction, f.path || e.dst
     FROM family f
     JOIN edges e ON e.src = f.case_id
+    JOIN live    ON live.id = e.dst
     WHERE e.dst <> ALL (f.path)     -- never revisit a case on this path (remand cycles)
       AND f.depth < 25              -- hard depth cap
 )

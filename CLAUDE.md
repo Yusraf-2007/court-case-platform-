@@ -72,6 +72,24 @@
   route that reads them in `outputFileTracingIncludes` in `next.config.ts`.
 - Validate search params against known values before they reach a query
   (see `parseFilters` in `src/lib/cases.ts`).
+- Archived cases (`cases.deleted_at`, migration 019) must never reach a
+  public page. Every public query filters `deleted_at IS NULL`; shared
+  queries that admin pages also use take an explicit parameter for it
+  (`case_list.sql` $7, `case_detail.sql` $2). Add the filter to any new
+  public query.
+- Admin area (`/admin`):
+  - Writes use `writeDbTracked()`, which returns a receipt: the triggers
+    that fired (each trigger function calls `note_trigger_fired(TG_NAME)`,
+    019) and the audit rows written. Actions redirect with the receipt in
+    the URL (`src/lib/admin/receipt.ts`); a new trigger needs an entry in
+    `TRIGGERS` there, and a new write needs an entry in `DONE`.
+  - Every table the admin area writes needs an `audit_row()` trigger (019).
+  - Parties, hearings and orders share one field-spec format
+    (`src/lib/admin/form-spec.ts`): the same specs render the form and drive
+    server-side validation (`validateFields`). Constraint and trigger names
+    map to field messages in `ERRORS` (`src/lib/admin/records.ts`).
+  - Deletes are refused while anything refers to the row, with counts;
+    archiving is the safe way to take a case off the public register.
 
 ## SQL coverage
 
@@ -85,13 +103,19 @@ or script.
 
 - [x] CREATE TABLE: 001
 - [x] CREATE TYPE: 004 (six enums)
-- [x] ALTER TABLE: 005 (`filed_on`, `stage` made nullable)
+- [x] ALTER TABLE: 005 (`filed_on`, `stage` made nullable); 019 (`ADD COLUMN`,
+      `DROP CONSTRAINT` of the audit log's FK)
   - also ALTER TYPE: 007 (`disposal_mode` gains `converted`)
-- [x] DROP: 007 (`DROP INDEX case_relationships_from_case_id_idx`)
-- [x] CREATE INDEX: 001 (including a partial unique index)
+- [x] DROP: 007 (`DROP INDEX case_relationships_from_case_id_idx`); 019
+      (`DROP TRIGGER`, to widen `hearings_not_after_disposal` to updates)
+- [x] CREATE INDEX: 001 (including a partial unique index); 019 (partial
+      index on `cases (deleted_at) WHERE deleted_at IS NULL`)
 - [x] CREATE VIEW: 001 (`usable_limitation_rules`)
-- [x] CREATE FUNCTION: 011 (five PL/pgSQL trigger functions)
-- [x] CREATE TRIGGER: 011 (status/stage audit, court audit, FIR only on
+- [x] CREATE FUNCTION: 011 (five PL/pgSQL trigger functions); 019 (generic
+      `audit_row()` driven by trigger arguments, and SQL function
+      `note_trigger_fired()`)
+- [x] CREATE TRIGGER: 019 (six `audit_row()` triggers, one function with
+      per-table arguments); 011 (status/stage audit, court audit, FIR only on
       G.R., no hearing after disposal, final order disposes case)
   - [ ] deferred: appeal-direction trigger, until the four
         `case_type_remedies` gaps in 001 are verified
@@ -100,13 +124,15 @@ or script.
 
 - [x] INSERT: 001 (including `INSERT ... SELECT`)
 - [x] UPDATE: 003
-- [x] DELETE: `scripts/clear_synthetic_hearings.sql`
+- [x] DELETE: `scripts/clear_synthetic_hearings.sql`; `tests/integrity_test.sql`
+      test 9 (a case delete keeps its audit history)
 - [x] SELECT: 001
   - [x] joins: 001 (`case_type_remedies` seed joins `case_types`)
   - [x] aggregates: `queries/adjournment_analysis.sql` (GROUP BY with
         `count(*)`, `count(*) FILTER`, and `sum(count(*)) OVER` for shares);
         window aggregates also in `queries/case_family.sql`
-  - [x] subqueries: 003 (scalar subquery in `UPDATE ... SET`)
+  - [x] subqueries: 003 (scalar subquery in `UPDATE ... SET`); `NOT EXISTS`
+        anti-join in `queries/pending_deadlines.sql`
   - [x] recursive CTE: `queries/case_family.sql`
   - [x] set operations: `queries/case_stages.sql` (`UNION ALL` of case dates
         and orders, then `DISTINCT ON` per stage; `LATERAL unnest` maps one

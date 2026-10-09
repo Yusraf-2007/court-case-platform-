@@ -37,3 +37,28 @@ export function writeDb<T>(admin: AdminSession, fn: (sql: postgres.TransactionSq
     return fn(sql);
   }) as Promise<T>;
 }
+
+export type WriteReceipt<T> = {
+  value: T;
+  fired: string[]; // triggers that ran, in order (migration 019's app.triggers_fired)
+  logged: number; // case_audit_log rows this write added
+};
+
+// writeDb, plus a receipt of what the database did: which triggers fired and
+// how many audit rows they wrote. Read inside the transaction, just before
+// it commits. now() is the transaction's start time, which every audit row
+// of this transaction carries as changed_at.
+export function writeDbTracked<T>(
+  admin: AdminSession,
+  fn: (sql: postgres.TransactionSql) => Promise<T>,
+): Promise<WriteReceipt<T>> {
+  return writeDb(admin, async (sql) => {
+    const [{ before }] = await sql<{ before: string }[]>`SELECT coalesce(max(id), 0) AS before FROM case_audit_log`;
+    const value = await fn(sql);
+    const [{ fired, logged }] = await sql<{ fired: string | null; logged: number }[]>`
+      SELECT current_setting('app.triggers_fired', true) AS fired,
+             (SELECT count(*)::int FROM case_audit_log
+              WHERE id > ${before} AND changed_at = now() AND changed_by = ${admin.username}) AS logged`;
+    return { value, fired: fired ? fired.split(",") : [], logged };
+  });
+}

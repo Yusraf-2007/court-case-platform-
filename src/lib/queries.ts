@@ -17,7 +17,7 @@ function queryText(name: string): string {
   return text;
 }
 
-type Param = string | number | null;
+type Param = string | number | boolean | null;
 
 // Run db/queries/<name>.sql with positional parameters ($1, $2, ...).
 // sql.unsafe() means only that the SQL *text* is not a tagged template: it is

@@ -236,7 +236,7 @@ const { case_1, court_3 } = ids.rows[0];
 const benches: Bench[] = [
   { name: "case list (court, stage, status)", file: "case_list.sql",
     // court, case type, stage, status, page size (NULL = all), offset
-    params: [court_3, null, "prosecution_evidence", "pending", null, 0] },
+    params: [court_3, null, "prosecution_evidence", "pending", null, 0, null] },
   { name: "case_family (Case 1)", file: "case_family.sql", params: { case_id: case_1 } },
   { name: "case_timeline (Case 1)", file: "case_timeline.sql", params: [case_1] },
   { name: "adjournment_analysis", file: "adjournment_analysis.sql", params: {} },

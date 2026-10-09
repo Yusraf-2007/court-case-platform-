@@ -30,7 +30,7 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
           <CardTitle>
             Edit {typeCode} {values.case_number}/{values.case_year}
           </CardTitle>
-          <CardDescription>Changes to status, stage and court are recorded in the audit log under your name.</CardDescription>
+          <CardDescription>Every change is written to the audit log under your name; the database triggers that fire are listed after you save.</CardDescription>
         </CardHeader>
         <CardContent>
           <CaseForm
@@ -38,7 +38,7 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
             options={options}
             initial={values}
             submitLabel="Save changes"
-            cancelHref={`/cases/${id}`}
+            cancelHref={`/admin/cases/${id}`}
           />
         </CardContent>
       </Card>

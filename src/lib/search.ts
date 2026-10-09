@@ -15,7 +15,8 @@ export async function findCaseByNumber(typeCode: string, number: number, year: n
   const [row] = await readDb()<{ id: string }[]>`
     SELECT c.id
     FROM cases c JOIN case_types ct ON ct.id = c.case_type_id
-    WHERE ct.code = ${typeCode} AND c.case_number = ${number} AND c.case_year = ${year}`;
+    WHERE ct.code = ${typeCode} AND c.case_number = ${number} AND c.case_year = ${year}
+      AND c.deleted_at IS NULL`;
   return row?.id ?? null;
 }
 
@@ -36,6 +37,7 @@ export async function searchByParty(query: string): Promise<SearchHit[]> {
     JOIN case_types ct   ON ct.id = c.case_type_id
     JOIN courts co       ON co.id = c.court_id
     WHERE p.full_name ILIKE ${pattern}
+      AND c.deleted_at IS NULL
     ORDER BY c.id
     LIMIT 50`;
   return [...rows];
@@ -53,6 +55,7 @@ export async function searchByNumber(number: number): Promise<SearchHit[]> {
     JOIN case_types ct ON ct.id = c.case_type_id
     JOIN courts co     ON co.id = c.court_id
     WHERE c.case_number = ${number}
+      AND c.deleted_at IS NULL
     ORDER BY c.case_year DESC, ct.code
     LIMIT 50`;
   return [...rows];
