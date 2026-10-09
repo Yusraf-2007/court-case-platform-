@@ -3,7 +3,19 @@ import { cn } from "@/lib/utils";
 // The platform's seal: an original design (balance scales inside a beaded
 // ring). It deliberately does not use the State Emblem of India, the Ashoka
 // Chakra or any court's official seal, whose use is restricted by law.
-export function Seal({ className, animated = false }: { className?: string; animated?: boolean }) {
+//
+// `animated` settles it in on load; `turning` rotates the lettered outer
+// ring once every four minutes while the scales stay level (switched off
+// under prefers-reduced-motion).
+export function Seal({
+  className,
+  animated = false,
+  turning = false,
+}: {
+  className?: string;
+  animated?: boolean;
+  turning?: boolean;
+}) {
   return (
     <svg
       viewBox="0 0 120 120"
@@ -17,20 +29,22 @@ export function Seal({ className, animated = false }: { className?: string; anim
       <circle cx="60" cy="60" r="57" fill="var(--card)" stroke="currentColor" strokeWidth="2.5" />
       <circle cx="60" cy="60" r="51" fill="none" stroke="var(--brass)" strokeWidth="1" />
       <circle cx="60" cy="60" r="33" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      {Array.from({ length: 36 }, (_, i) => {
-        const a = (i / 36) * Math.PI * 2;
-        return (
-          <circle key={i} cx={60 + Math.cos(a) * 54} cy={60 + Math.sin(a) * 54} r="0.9" fill="var(--brass)" />
-        );
-      })}
-      <text
-        fill="currentColor"
-        style={{ fontFamily: "var(--font-cinzel)", fontSize: "7.4px", letterSpacing: "1.6px", fontWeight: 600 }}
-      >
-        <textPath href="#seal-ring" startOffset="50%" textAnchor="middle">
-          CRIMINAL CASE REGISTRY · NYAYA ·
-        </textPath>
-      </text>
+      <g className={turning ? "seal-turn" : undefined}>
+        {Array.from({ length: 36 }, (_, i) => {
+          const a = (i / 36) * Math.PI * 2;
+          return (
+            <circle key={i} cx={60 + Math.cos(a) * 54} cy={60 + Math.sin(a) * 54} r="0.9" fill="var(--brass)" />
+          );
+        })}
+        <text
+          fill="currentColor"
+          style={{ fontFamily: "var(--font-cinzel)", fontSize: "7.4px", letterSpacing: "1.6px", fontWeight: 600 }}
+        >
+          <textPath href="#seal-ring" startOffset="50%" textAnchor="middle">
+            CRIMINAL CASE REGISTRY · NYAYA ·
+          </textPath>
+        </text>
+      </g>
       {/* Balance scales */}
       <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M60 38 V80" />

@@ -36,8 +36,8 @@ export default async function DeadlinesPage() {
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10">
       <div className="rise-in">
-        <p className="font-display text-brass text-xs tracking-[0.25em] uppercase">Limitation</p>
-        <h1 className="font-serif text-4xl font-semibold">Deadlines</h1>
+        <p className="font-display text-maroon text-kicker uppercase">Limitation</p>
+        <h1 className="font-serif text-title font-semibold">Deadlines</h1>
         <p className="text-muted-foreground mt-2 font-serif text-lg">
           Time limits for filing an appeal or revision, counted from the order being challenged.
         </p>

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { SearchXIcon } from "lucide-react";
+
 import { CaseLookup } from "@/components/case-lookup";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,15 +39,23 @@ export default async function SearchPage({
 
   let hits: SearchHit[] | null = null;
   let heading = "";
+  let notFound: string | null = null; // the number the litigant asked for, when nothing matches it
   if (validNumber) {
     if (validType && validYear) {
+      // The full number: go straight to the case.
       const id = await findCaseByNumber(type, Number(number), Number(year));
       if (id) redirect(`/cases/${id}`);
-      heading = `No ${type} ${number}/${year} found. Cases numbered ${number} in any register or year:`;
-    } else {
-      heading = `Cases numbered ${number}:`;
+      notFound = `${type} ${number}/${year}`;
     }
     hits = await searchByNumber(Number(number));
+    if (validType && !year) {
+      // No year given: go straight there if the register and number are unique.
+      const inRegister = hits.filter((h) => h.case_no.startsWith(`${type} `));
+      if (inRegister.length === 1) redirect(`/cases/${inRegister[0].id}`);
+      if (inRegister.length === 0) notFound = `${type} ${number}`;
+      else hits = inRegister;
+    }
+    heading = notFound ? `Other cases numbered ${number}:` : `Cases numbered ${number}:`;
   } else if (party.length >= 2) {
     hits = await searchByParty(party);
     heading = `Cases with a party named “${party}”:`;
@@ -54,8 +64,8 @@ export default async function SearchPage({
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 py-10">
       <div className="rise-in">
-        <p className="font-display text-brass text-xs tracking-[0.25em] uppercase">Search</p>
-        <h1 className="font-serif text-4xl font-semibold">Find a case</h1>
+        <p className="font-display text-maroon text-kicker uppercase">Search</p>
+        <h1 className="font-serif text-title font-semibold">Find a case</h1>
         <p className="text-muted-foreground mt-2 font-serif text-lg">
           By the case number on your papers, or by the name of a party.
         </p>
@@ -82,7 +92,21 @@ export default async function SearchPage({
         </section>
       </div>
 
-      {hits !== null ? (
+      {notFound ? (
+        <section role="status" className="bg-card border-maroon/40 flex gap-4 rounded-sm border-y border-r border-l-4 p-5">
+          <SearchXIcon className="text-maroon mt-1 size-5 shrink-0" aria-hidden />
+          <div>
+            <p className="font-serif text-xl">No case {notFound} is on record.</p>
+            <p className="text-muted-foreground mt-1">
+              Check the register, number and year against your summons or order sheet. The register
+              is the letters before the number, such as G.R. or C.C. This system holds synthetic
+              records only, so a real case will not be here.
+            </p>
+          </div>
+        </section>
+      ) : null}
+
+      {hits !== null && !(notFound && hits.length === 0) ? (
         <section aria-live="polite" className="flex flex-col gap-3">
           <h2 className="font-serif text-xl">{heading}</h2>
           {hits.length === 0 ? (

@@ -13,8 +13,8 @@ export default async function AdminHome() {
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10">
       <div>
-        <p className="font-display text-brass text-xs tracking-[0.25em] uppercase">Administration</p>
-        <h1 className="font-serif text-4xl font-semibold">Welcome, {admin.username}</h1>
+        <p className="font-display text-maroon text-kicker uppercase">Administration</p>
+        <h1 className="font-serif text-title font-semibold">Welcome, {admin.username}</h1>
         <p className="text-muted-foreground mt-2">The full dashboard is the next build step.</p>
       </div>
       <div>

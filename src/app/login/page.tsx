@@ -24,7 +24,7 @@ export default async function LoginPage({
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
           <Seal className="size-20" />
           <div>
-            <p className="font-display text-brass text-xs tracking-[0.25em] uppercase">Registry</p>
+            <p className="font-display text-maroon text-kicker uppercase">Registry</p>
             <h1 className="font-serif text-3xl font-semibold">Administrator sign-in</h1>
             <p className="text-muted-foreground mt-2 text-sm">
               Case records are public. Sign-in is only for court staff who maintain them.

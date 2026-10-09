@@ -12,6 +12,7 @@ import { getCase, parseCaseId } from "@/lib/case-detail";
 import { formatDate, humanize, statusVariant } from "@/lib/format";
 
 import { Parties } from "./parties";
+import { StageTree } from "./stage-tree";
 import { Timeline } from "./timeline";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export default async function CasePage({ params }: Props) {
   const session = await getSession();
   const data = await loadCase((await params).id);
   if (!data) notFound();
-  const { detail: c, timeline, parties, sections } = data;
+  const { detail: c, timeline, parties, sections, stages } = data;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
@@ -57,7 +58,7 @@ export default async function CasePage({ params }: Props) {
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{c.case_no}</h1>
+          <h1 className="text-title font-serif font-semibold">{c.case_no}</h1>
           <Badge variant={statusVariant[c.status] ?? "outline"}>{humanize(c.status)}</Badge>
           {session?.role === "admin" ? (
             <Button asChild variant="outline" size="sm" className="ml-auto">
@@ -71,6 +72,13 @@ export default async function CasePage({ params }: Props) {
           {c.case_type_name} · {c.court}
         </p>
       </div>
+
+      <section className="bg-card border-border rounded-sm border px-5 py-8 sm:px-10 sm:py-10" aria-labelledby="stage-heading">
+        <p id="stage-heading" className="font-display text-maroon text-kicker mb-3 uppercase">
+          Where this case stands
+        </p>
+        <StageTree progress={stages} status={c.status} disposalMode={c.disposal_mode} />
+      </section>
 
       <Card>
         <CardContent>

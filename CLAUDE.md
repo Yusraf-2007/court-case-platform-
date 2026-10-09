@@ -108,6 +108,9 @@ or script.
         window aggregates also in `queries/case_family.sql`
   - [x] subqueries: 003 (scalar subquery in `UPDATE ... SET`)
   - [x] recursive CTE: `queries/case_family.sql`
+  - [x] set operations: `queries/case_stages.sql` (`UNION ALL` of case dates
+        and orders, then `DISTINCT ON` per stage; `LATERAL unnest` maps one
+        order to several stages)
 
 ### DCL
 

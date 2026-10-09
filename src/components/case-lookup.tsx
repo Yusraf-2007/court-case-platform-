@@ -18,8 +18,8 @@ export function CaseLookup({
 }) {
   return (
     <form action="/search" method="get" className="grid gap-4">
-      <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
-        <div className="grid gap-1.5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="col-span-2 grid gap-1.5 sm:col-span-1">
           <Label htmlFor="lookup-type" className="text-muted-foreground text-xs tracking-wide uppercase">
             Register
           </Label>

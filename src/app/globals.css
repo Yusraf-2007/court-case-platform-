@@ -2,7 +2,11 @@
 @import "tw-animate-css";
 
 /* ===========================================================================
-   One palette for every page: court ink, parchment, seal maroon, brass.
+   One palette for every page, public and admin alike:
+     ink        near-black text and the header band
+     parchment  warm off-white surfaces (never pure white)
+     maroon     the single accent: oxblood, as on a court seal
+     brass      muted gold, for rules, seals and ornament only, never text
    Components use only these tokens (shadcn names), so the whole app shifts
    together if a value changes.
    =========================================================================== */
@@ -40,6 +44,21 @@
   --color-parchment: var(--parchment);
   --color-success: var(--success);
 
+  /* Type scale: a deliberate ratio (~1.25), not Tailwind's defaults.
+     Serif (EB Garamond) for headings and prose, Cinzel for inscriptional
+     small capitals, Geist Sans for data and controls. */
+  --text-kicker: 0.75rem;
+  --text-kicker--letter-spacing: 0.28em;
+  --text-kicker--line-height: 1rem;
+  --text-lead: 1.3125rem;
+  --text-lead--line-height: 1.55;
+  --text-title: 2.5rem;
+  --text-title--line-height: 1.1;
+  --text-hero: clamp(2.25rem, 1.4rem + 3.6vw, 4rem);
+  --text-hero--line-height: 1.05;
+  --text-figure: clamp(2.25rem, 1.8rem + 1.8vw, 3.25rem);
+  --text-figure--line-height: 1;
+
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
@@ -49,15 +68,15 @@
 :root {
   --radius: 0.25rem; /* squared, document-like corners */
 
-  --ink: oklch(0.255 0.035 262);            /* #1f2a3f  bench-ink navy */
+  --ink: oklch(0.235 0.022 258);            /* #1c2330  iron-gall ink */
   --ink-foreground: oklch(0.965 0.012 85);
-  --maroon: oklch(0.385 0.105 18);          /* #6e2330  seal maroon */
+  --maroon: oklch(0.39 0.11 20);            /* #702232  oxblood */
   --brass: oklch(0.63 0.085 75);            /* #a8854a  brass fittings */
   --parchment: oklch(0.962 0.016 85);       /* #f6f1e6 */
   --success: oklch(0.47 0.08 155);          /* muted ledger green */
 
   --background: var(--parchment);
-  --foreground: oklch(0.22 0.025 262);
+  --foreground: oklch(0.21 0.018 258);
   --card: oklch(0.99 0.008 85);
   --card-foreground: var(--foreground);
   --popover: var(--card);
@@ -73,7 +92,7 @@
   --destructive: oklch(0.5 0.17 25);
   --border: oklch(0.86 0.025 80);
   --input: oklch(0.82 0.03 78);
-  --ring: var(--brass);
+  --ring: var(--maroon);
 }
 
 @layer base {
@@ -85,6 +104,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Figures line up in every table, counter and date. */
+    font-variant-numeric: lining-nums tabular-nums;
     min-height: 100svh;
     display: flex;
     flex-direction: column;
@@ -150,34 +171,47 @@
 @keyframes seal-settle {
   from {
     opacity: 0;
-    transform: rotate(-24deg) scale(0.92);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
     transform: none;
   }
 }
+@keyframes seal-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
+/* On load: a slow fade and a few pixels of rise. Stagger with
+   animation-delay in 80ms steps; the whole sequence stays under 800ms. */
 @utility rise-in {
-  animation: rise-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @utility seal-settle {
-  animation: seal-settle 1600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: seal-settle 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* Ambient: one full turn every four minutes. Reads as stillness. */
+@utility seal-turn {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: seal-turn 240s linear infinite;
 }
 /* SVG strokes that draw themselves: set pathLength="1" on the element. */
 @utility draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: draw-line 1800ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation: draw-line 700ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }
 
 /* Scroll reveal (see components/reveal.tsx). */
 [data-reveal] {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(10px);
   transition:
-    opacity 800ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
   transition-delay: var(--reveal-delay, 0ms);
 }
 [data-reveal][data-visible="true"] {
@@ -191,7 +225,11 @@
   *::after {
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+  .seal-turn {
+    animation: none !important;
   }
   [data-reveal] {
     opacity: 1;
