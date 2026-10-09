@@ -15,13 +15,14 @@ export function LoginForm({ next }: { next: string }) {
     <form action={action} className="grid gap-4">
       <input type="hidden" name="next" value={next} />
       <div className="grid gap-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="login">Email or username</Label>
         <Input
-          id="username"
-          name="username"
+          id="login"
+          name="login"
           autoComplete="username"
           autoCapitalize="none"
-          defaultValue={state.username}
+          spellCheck={false}
+          defaultValue={state.login}
           required
         />
       </div>

@@ -2,8 +2,9 @@ import "server-only";
 import postgres from "postgres";
 
 import { getFilterOptions } from "@/lib/cases";
-import { adminDb, db } from "@/lib/db";
-import type { Session } from "@/lib/session";
+import type { AdminSession } from "@/lib/auth";
+import { readDb as db } from "@/lib/db-read";
+import { writeDb } from "@/lib/db-write";
 
 // ---------------------------------------------------------------------------
 // Form options and current values
@@ -144,12 +145,11 @@ export function validateCase(v: CaseFormValues, o: CaseFormOptions) {
 }
 
 // ---------------------------------------------------------------------------
-// Saving: through app_admin, in one transaction that names the user, so the
-// audit triggers record who changed status, stage or court.
+// Saving: through db-write.ts (app_admin_user), in one transaction that names
+// the admin, so the audit triggers record who changed status, stage or court.
 // ---------------------------------------------------------------------------
-export async function saveCase(user: Session, input: CaseInput, id: number | null): Promise<number | null> {
-  const rows = await adminDb().begin(async (sql) => {
-    await sql`SELECT set_config('app.user', ${user.username}, true)`;
+export async function saveCase(admin: AdminSession, input: CaseInput, id: number | null): Promise<number | null> {
+  const rows = await writeDb(admin, async (sql) => {
     const v = input;
     if (id === null) {
       return sql<{ id: string }[]>`

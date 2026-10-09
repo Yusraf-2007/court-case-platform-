@@ -1,14 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // The app reads its SQL from db/queries at runtime. Include those files in
-  // the serverless bundle, since file tracing cannot see paths built from
-  // process.cwd().
+  // Pages read their SQL from db/queries at runtime (src/lib/queries.ts).
+  // File tracing cannot see paths built from process.cwd(), so include the
+  // SQL files in every route's serverless bundle.
   outputFileTracingIncludes: {
-    "/cases": ["./db/queries/**/*.sql"],
-    "/cases/[id]": ["./db/queries/**/*.sql"],
-    "/cases/[id]/edit": ["./db/queries/**/*.sql"],
-    "/cases/new": ["./db/queries/**/*.sql"],
+    "/**": ["./db/queries/**/*.sql"],
   },
 };
 

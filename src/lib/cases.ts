@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 
-import { db } from "@/lib/db";
+import { readDb as db } from "@/lib/db-read";
 import { runQuery } from "@/lib/queries";
 
 export const PAGE_SIZE = 20;

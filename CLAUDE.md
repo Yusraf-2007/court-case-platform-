@@ -19,8 +19,14 @@
 
 - Next.js 15 (App Router, `src/`), TypeScript, Tailwind v4, shadcn/ui
   (`components.json`; components live in `src/components/ui`).
-- Database access: the `postgres` package via `src/lib/db.ts`, reading
-  `DATABASE_URL`. No ORM.
+- Database access: the `postgres` package, no ORM, through two connections:
+  - `src/lib/db-read.ts` (`readDb()`, `DATABASE_URL`, login `app_web`): every
+    public page and every read.
+  - `src/lib/db-write.ts` (`writeDb(admin, fn)`, `ADMIN_DATABASE_URL`, login
+    `app_admin_user`, migration 017): writes only. It takes an
+    `AdminSession`, a branded type that only `requireAdmin()` and
+    `authenticateAdmin()` in `src/lib/auth.ts` can produce, so code outside
+    an authenticated admin handler cannot open a write transaction.
 - The app connects as `app_web` (migration 014), never as `neondb_owner`.
   `app_web` holds only `app_readonly`'s rights (012): SELECT on every table,
   no INSERT/UPDATE/DELETE/TRUNCATE, no CREATE. Every session also defaults to
@@ -35,24 +41,28 @@
   - Use `?sslmode=require` in the URL. postgres.js passes unknown URL
     parameters (such as Neon's `channel_binding`) to the server, which rejects
     them.
-- Auth (migration 015): JWT (HS256, `jose`) in an httpOnly, SameSite=Lax
-  cookie, 8-hour expiry, signed with `JWT_SECRET`. Roles: `viewer` (default
-  for new users) and `admin`.
+- Auth (migrations 015, 018): public pages (`/`, `/cases`, `/cases/[id]`,
+  `/search`, `/deadlines`) need no login. Only admins sign in, at `/login`,
+  with a username or an email. JWT (HS256, `jose`) in an httpOnly, Secure,
+  SameSite=Lax cookie, 8-hour expiry, signed with `JWT_SECRET` (32+ chars).
+  - The `viewer` role (the default for new users) is kept but unused: it is
+    reserved for a future litigant portal. A viewer cannot sign in today.
   - Users live in schema `app_auth`; passwords are bcrypt-hashed in the
-    database. `app_readonly`/`app_web`/`app_admin` cannot read
-    `app_auth.users`. The app calls only `app_auth.authenticate()` (returns
-    id, name, role, never the hash) and `app_auth.current_role_of()`.
+    database. No app role can read `app_auth.users`. The app calls only
+    `app_auth.authenticate()` (returns id, name, role, never the hash),
+    `app_auth.current_role_of()` and, via the write connection,
+    `app_auth.record_login()`.
   - Create users with `db/scripts/create_user.sql` as the owner; reset with
-    `SELECT app_auth.set_password(...)`. Never put passwords in migrations.
-  - Three checks guard writes: middleware (`src/middleware.ts`) blocks
-    anonymous requests and non-admins on `/cases/new` and `/cases/*/edit`;
-    each page and server action re-checks (`src/lib/auth.ts`); and
-    `requireAdmin()` re-reads the role from the database, so demoting or
-    disabling a user stops their writes immediately.
-  - Admin writes use `adminDb()` (`ADMIN_DATABASE_URL`, login `app_admin`:
-    INSERT/UPDATE on `cases` only, plus the audit inserts its triggers make).
-    Each write transaction sets `app.user`, which the audit triggers record in
-    `case_audit_log.changed_by`.
+    `SELECT app_auth.set_password(...)` and `app_auth.set_email(...)`. Never
+    put passwords in migrations.
+  - Three checks guard `/admin`: middleware (`src/middleware.ts`) redirects
+    anyone without an admin session; each page and server action calls
+    `requireAdmin()`; and `requireAdmin()` re-reads the role from the
+    database, so demoting or disabling a user ends their session at once.
+  - `app_admin` (017) is a NOLOGIN group with SELECT/INSERT/UPDATE/DELETE on
+    `public` tables, except `case_audit_log`, which is append-only.
+    `app_admin_user` is its login. Each write transaction sets `app.user`,
+    which the audit triggers record in `case_audit_log.changed_by`.
   - The future text-to-SQL layer must get its own login without USAGE on
     `app_auth`, so it cannot call `authenticate()`.
 - Every value from a request goes to Postgres as a bound parameter: tagged
@@ -101,8 +111,8 @@ or script.
 
 ### DCL
 
-- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`); 015 (`app_admin`: INSERT/UPDATE on `cases`; EXECUTE on `app_auth` functions to `app_web`)
-- [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`); 015 (EXECUTE on `app_auth` functions from PUBLIC)
+- [x] GRANT: 012 (`app_readonly`: USAGE, SELECT, default privileges); 014 (`app_web` IN ROLE `app_readonly`); 015 (`app_admin`: INSERT/UPDATE on `cases`; EXECUTE on `app_auth` functions to `app_web`); 017 (`app_admin`: SELECT/INSERT/UPDATE/DELETE on `public`, `app_admin_user` IN ROLE `app_admin`); 018 (USAGE on `app_auth` and EXECUTE on `record_login` to `app_admin`)
+- [x] REVOKE: 012 (INSERT, UPDATE, DELETE from `app_readonly`); 015 (EXECUTE on `app_auth` functions from PUBLIC); 017 (UPDATE, DELETE on `case_audit_log` from `app_admin`)
 
 ### TCL
 

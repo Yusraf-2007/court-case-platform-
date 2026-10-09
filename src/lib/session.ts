@@ -39,6 +39,6 @@ export async function verifySession(token: string | undefined): Promise<Session 
 }
 
 // Only same-site paths are allowed as post-login redirects.
-export function safeNext(next: unknown): string {
-  return typeof next === "string" && /^\/(?![/\\])/.test(next) ? next : "/cases";
+export function safeNext(next: unknown, fallback = "/admin"): string {
+  return typeof next === "string" && /^\/(?![/\\])/.test(next) ? next : fallback;
 }

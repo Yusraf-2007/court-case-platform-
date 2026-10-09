@@ -2,27 +2,30 @@
 
 import { redirect } from "next/navigation";
 
-import { authenticate, endSession, startSession } from "@/lib/auth";
+import { authenticateAdmin, endSession, startSession } from "@/lib/auth";
+import { writeDb } from "@/lib/db-write";
 import { safeNext } from "@/lib/session";
 
-export type LoginState = { error?: string; username?: string };
+export type LoginState = { error?: string; login?: string };
 
 export async function login(_prev: LoginState, form: FormData): Promise<LoginState> {
-  const username = String(form.get("username") ?? "").trim();
+  const login = String(form.get("login") ?? "").trim();
   const password = String(form.get("password") ?? "");
-  if (!username || !password || username.length > 64 || password.length > 256) {
-    return { error: "Enter your username and password.", username };
+  if (!login || !password || login.length > 254 || password.length > 256) {
+    return { error: "Enter your email or username, and your password.", login };
   }
 
-  const session = await authenticate(username, password);
-  // One message for both cases, so the form does not reveal which usernames exist.
-  if (!session) return { error: "Incorrect username or password.", username };
+  const admin = await authenticateAdmin(login, password);
+  // One message for every failure, so the form reveals neither which
+  // accounts exist nor which are administrators.
+  if (!admin) return { error: "Incorrect credentials, or this account is not an administrator.", login };
 
-  await startSession(session);
-  redirect(safeNext(form.get("next")));
+  await writeDb(admin, (sql) => sql`SELECT app_auth.record_login(${admin.userId})`);
+  await startSession(admin);
+  redirect(safeNext(form.get("next"), "/admin"));
 }
 
 export async function logout() {
   await endSession();
-  redirect("/login");
+  redirect("/");
 }

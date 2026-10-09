@@ -1,13 +1,20 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* ===========================================================================
+   One palette for every page: court ink, parchment, seal maroon, brass.
+   Components use only these tokens (shadcn names), so the whole app shifts
+   together if a value changes.
+   =========================================================================== */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-garamond), Georgia, "Times New Roman", serif;
+  --font-display: var(--font-cinzel), var(--font-garamond), Georgia, serif;
+
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -24,60 +31,170 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+
+  /* Institutional accents */
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-maroon: var(--maroon);
+  --color-brass: var(--brass);
+  --color-parchment: var(--parchment);
+  --color-success: var(--success);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-}
+  --radius: 0.25rem; /* squared, document-like corners */
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ink: oklch(0.255 0.035 262);            /* #1f2a3f  bench-ink navy */
+  --ink-foreground: oklch(0.965 0.012 85);
+  --maroon: oklch(0.385 0.105 18);          /* #6e2330  seal maroon */
+  --brass: oklch(0.63 0.085 75);            /* #a8854a  brass fittings */
+  --parchment: oklch(0.962 0.016 85);       /* #f6f1e6 */
+  --success: oklch(0.47 0.08 155);          /* muted ledger green */
+
+  --background: var(--parchment);
+  --foreground: oklch(0.22 0.025 262);
+  --card: oklch(0.99 0.008 85);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--ink);
+  --primary-foreground: var(--ink-foreground);
+  --secondary: oklch(0.925 0.02 80);
+  --secondary-foreground: var(--ink);
+  --muted: oklch(0.93 0.018 82);
+  --muted-foreground: oklch(0.47 0.025 70);
+  --accent: oklch(0.93 0.025 80);
+  --accent-foreground: var(--ink);
+  --destructive: oklch(0.5 0.17 25);
+  --border: oklch(0.86 0.025 80);
+  --input: oklch(0.82 0.03 78);
+  --ring: var(--brass);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Ornament
+   --------------------------------------------------------------------------- */
+
+/* A brass rule with a centred diamond, as on a printed judgment. */
+@utility rule-ornament {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--brass);
+  &::before,
+  &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+  }
+}
+
+/* Faint ruled-paper texture for document surfaces. */
+@utility paper {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    color-mix(in oklch, var(--brass) 10%, transparent) 31px,
+    color-mix(in oklch, var(--brass) 10%, transparent) 32px
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Motion: slow, eased, small distances. Everything is switched off for
+   people who ask for reduced motion.
+   --------------------------------------------------------------------------- */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes seal-settle {
+  from {
+    opacity: 0;
+    transform: rotate(-24deg) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility rise-in {
+  animation: rise-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility seal-settle {
+  animation: seal-settle 1600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* SVG strokes that draw themselves: set pathLength="1" on the element. */
+@utility draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-line 1800ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+/* Scroll reveal (see components/reveal.tsx). */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 800ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal][data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
   }
 }

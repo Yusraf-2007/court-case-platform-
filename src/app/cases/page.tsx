@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PAGE_SIZE, getFilterOptions, listCases, parseFilters, type CaseFilters } from "@/lib/cases";
-import { requireUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { formatDate, humanize, statusVariant } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Cases" };
@@ -41,7 +41,7 @@ export default async function CasesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await requireUser();
+  const session = await getSession();
   const params = await searchParams;
   const options = await getFilterOptions();
   const filters = parseFilters(params, options);
@@ -56,12 +56,6 @@ export default async function CasesPage({
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
-      {params.denied ? (
-        <p role="alert" className="bg-muted rounded-lg border px-4 py-3 text-sm">
-          Only admins can add or edit cases.
-        </p>
-      ) : null}
-
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Cases</h1>
@@ -69,9 +63,9 @@ export default async function CasesPage({
             Criminal cases across the Begusarai courts and their appellate forums.
           </p>
         </div>
-        {session.role === "admin" ? (
+        {session?.role === "admin" ? (
           <Button asChild>
-            <Link href="/cases/new">
+            <Link href="/admin/cases/new">
               <PlusIcon /> New case
             </Link>
           </Button>

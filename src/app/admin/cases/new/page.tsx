@@ -22,7 +22,7 @@ export default async function NewCasePage() {
           <CardDescription>Register a case. Parties, sections and orders are added separately.</CardDescription>
         </CardHeader>
         <CardContent>
-          <CaseForm action={createCase} options={options} initial={EMPTY_CASE} submitLabel="Add case" cancelHref="/cases" />
+          <CaseForm action={createCase} options={options} initial={EMPTY_CASE} submitLabel="Add case" cancelHref="/admin" />
         </CardContent>
       </Card>
     </main>
