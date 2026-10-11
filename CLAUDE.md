@@ -103,6 +103,11 @@
     clears its embedding (020's trigger); re-run the backfill after edits.
   - Never paste vectors into the audit log: `audit_orders` omits the
     embedding and tsvector columns (020).
+  - Evaluation: `npm run search:eval` (`db/tests/search_eval.ts`) scores
+    P@1/5/10 and MRR for full-text, semantic and hybrid on
+    `db/tests/search_eval.json`, using the same SQL files and the same
+    fusion (`src/lib/rrf.ts`) as the page. Keep it that way: change the
+    search and the harness together.
 
 ## SQL coverage
 

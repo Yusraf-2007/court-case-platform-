@@ -1,24 +1,20 @@
 import "server-only";
 
 import { readDb } from "@/lib/db-read";
+import { toVectorLiteral } from "@/lib/embed-api";
 import { embedQuery, embeddingModel, embeddingsConfigured } from "@/lib/embeddings";
 import { runQuery } from "@/lib/queries";
+import { fuse } from "@/lib/rrf";
 
 // Hybrid search over order text. The two halves run as separate queries
 // (db/queries/search_orders_fts.sql and search_orders_vector.sql), each
-// returning its own ranked candidates, and are fused here with reciprocal
-// rank fusion:
-//
-//   fused(d) = sum over the methods that found d of 1 / (K + rank(d))
-//
-// RRF uses ranks, not scores, so a ts_rank_cd value and a cosine similarity
-// (different scales, different meanings) never have to be compared. A
-// document found by both methods collects two terms, so agreement wins.
-// Each result keeps both individual scores and ranks, so the page can show
-// what each half contributed.
+// returning its own ranked candidates, and are fused with reciprocal rank
+// fusion (lib/rrf.ts, shared with the evaluation harness). Each result
+// keeps both individual scores and ranks, so the page can show what each
+// half contributed.
 
-export const RRF_K = 60; // the constant from Cormack et al. (2009); damps the top ranks
-const DEPTH = 50; // candidates taken from each method before fusion
+export { RRF_K } from "@/lib/rrf";
+export const DEPTH = 50; // candidates taken from each method before fusion
 const TOP = 20;
 
 type Hit = { id: string; score: number; rank: string };
@@ -59,7 +55,7 @@ async function semanticHalf(query: string): Promise<{ hits: Hit[]; status: Seman
   if (embedded === 0) return { hits: [], status: { state: "no-embeddings", total, model } };
   try {
     const v = await embedQuery(query);
-    const hits = await runQuery<Hit>("search_orders_vector", [`[${v.join(",")}]`, model, DEPTH]);
+    const hits = await runQuery<Hit>("search_orders_vector", [toVectorLiteral(v), model, DEPTH]);
     return { hits: [...hits], status: { state: "ok", embedded, total, model } };
   } catch (e) {
     console.error("semantic search failed", e);
@@ -73,26 +69,14 @@ export async function searchOrders(query: string): Promise<OrderSearch> {
     semanticHalf(query),
   ]);
 
-  const byId = new Map<string, Pick<OrderResult, "fts" | "vector" | "fused">>();
-  const entry = (id: string) => {
-    let e = byId.get(id);
-    if (!e) byId.set(id, (e = { fts: null, vector: null, fused: 0 }));
-    return e;
-  };
-  for (const h of fts) {
-    const e = entry(h.id);
-    e.fts = { score: Number(h.score), rank: Number(h.rank) };
-    e.fused += 1 / (RRF_K + Number(h.rank));
-  }
-  for (const h of sem.hits) {
-    const e = entry(h.id);
-    e.vector = { score: Number(h.score), rank: Number(h.rank) };
-    e.fused += 1 / (RRF_K + Number(h.rank));
-  }
-
-  const top = [...byId.entries()]
-    .sort(([a, x], [b, y]) => y.fused - x.fused || Number(a) - Number(b))
-    .slice(0, TOP);
+  const ftsBy = new Map(fts.map((h) => [h.id, { score: Number(h.score), rank: Number(h.rank) }]));
+  const vecBy = new Map(sem.hits.map((h) => [h.id, { score: Number(h.score), rank: Number(h.rank) }]));
+  const top = fuse([
+    fts.map((h) => ({ id: h.id, rank: Number(h.rank) })),
+    sem.hits.map((h) => ({ id: h.id, rank: Number(h.rank) })),
+  ])
+    .slice(0, TOP)
+    .map(({ id, fused }) => [id, { fts: ftsBy.get(id) ?? null, vector: vecBy.get(id) ?? null, fused }] as const);
 
   const details = top.length
     ? await runQuery<{

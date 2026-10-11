@@ -1,0 +1,37 @@
+{
+  "_comment": "A three-question EXAMPLE of the format for db/tests/search_eval.ts. The real 30-question set goes in db/tests/search_eval.json.",
+  "questions": [
+    {
+      "id": "ex1",
+      "query": "convicted and fined",
+      "relevant": [
+        { "case": "GR 95/2022", "type": "conviction" },
+        { "case": "GR 412/2024", "type": "conviction" },
+        { "case": "NI 110/2023", "type": "conviction" },
+        { "case": "NI 201/2024", "type": "conviction" }
+      ],
+      "note": "Convictions that impose a fine; GR 120/2022 and GR 310/2022 impose imprisonment only."
+    },
+    {
+      "id": "ex2",
+      "query": "accused released on bail",
+      "relevant": [
+        { "case": "GR 120/2022", "type": "bail" },
+        { "case": "GR 412/2024", "type": "bail" },
+        { "case": "NI 201/2024", "type": "bail" },
+        { "case": "MISC 44/2026", "type": "bail" },
+        { "case": "MISC 92/2026", "type": "bail" }
+      ],
+      "note": "Bail granted or allowed; MISC 118/2025 (bail rejected) is not relevant. None of these orders contains the word 'released'."
+    },
+    {
+      "id": "ex3",
+      "query": "case thrown out because the complainant stopped coming to court",
+      "relevant": [
+        { "case": "CC 20/2023", "date": "2024-12-09" },
+        { "case": "NI 95/2023", "date": "2025-08-07" }
+      ],
+      "note": "Dismissals for default. Worded differently from the orders on purpose: a meaning match, not a word match."
+    }
+  ]
+}

@@ -28,7 +28,7 @@
 
 import postgres from "postgres";
 
-const DIMENSIONS = 1536;
+import { embedTexts, embeddingModel, toVectorLiteral } from "../../src/lib/embed-api";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -45,37 +45,21 @@ if ((limit !== null && !(Number.isInteger(limit) && limit > 0)) || !(Number.isIn
 const dbUrl = process.env.ADMIN_DATABASE_URL;
 const apiUrl = process.env.EMBEDDING_API_URL?.replace(/\/+$/, "");
 const apiKey = process.env.EMBEDDING_API_KEY;
-const model = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
+const model = embeddingModel();
 if (!dbUrl) throw new Error("ADMIN_DATABASE_URL is not set.");
 if (!dryRun && (!apiUrl || !apiKey)) throw new Error("EMBEDDING_API_URL and EMBEDDING_API_KEY must be set (or pass --dry-run).");
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// One embeddings request, retried. Returns one vector per input, in order.
+// One embeddings request, retried with exponential backoff on 429, 5xx and
+// network errors. A wrong dimension count or another 4xx fails at once.
 async function embed(texts: string[], attempts = 5): Promise<number[][]> {
   for (let attempt = 1; ; attempt++) {
-    let retryable = true;
     try {
-      const res = await fetch(`${apiUrl}/embeddings`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-        body: JSON.stringify({ model, input: texts }),
-        signal: AbortSignal.timeout(60_000),
-      });
-      if (!res.ok) {
-        retryable = res.status === 429 || res.status >= 500;
-        throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-      }
-      const body = (await res.json()) as { data: { index: number; embedding: number[] }[] };
-      const vectors = [...body.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
-      if (vectors.length !== texts.length) throw new Error(`asked for ${texts.length} embeddings, got ${vectors.length}`);
-      const bad = vectors.find((v) => v.length !== DIMENSIONS);
-      if (bad) {
-        retryable = false;
-        throw new Error(`${model} returned ${bad.length} dimensions; orders.embedding is vector(${DIMENSIONS}).`);
-      }
-      return vectors;
+      return await embedTexts(texts);
     } catch (e) {
+      const status = (e as Error & { status?: number }).status;
+      const retryable = status === undefined ? !/dimensions/.test((e as Error).message) : status === 429 || status >= 500;
       if (!retryable || attempt >= attempts) throw e;
       const wait = Math.min(30_000, 1000 * 2 ** (attempt - 1)) + Math.floor(Math.random() * 250);
       console.warn(`  attempt ${attempt} failed (${(e as Error).message}); retrying in ${wait} ms`);
@@ -120,7 +104,7 @@ try {
       for (let j = 0; j < batch.length; j++) {
         const rows = await tx`
           UPDATE orders
-          SET embedding = ${JSON.stringify(vectors[j])}::vector, embedding_model = ${model}
+          SET embedding = ${toVectorLiteral(vectors[j])}::vector, embedding_model = ${model}
           WHERE id = ${batch[j].id} AND embedding IS NULL AND order_text = ${batch[j].order_text}`;
         count += rows.count;
       }

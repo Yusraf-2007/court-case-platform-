@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "benchmark": "tsx db/tests/benchmark.ts"
+    "benchmark": "tsx db/tests/benchmark.ts",
+    "embed:orders": "tsx db/scripts/embed_orders.ts",
+    "search:eval": "tsx db/tests/search_eval.ts"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
