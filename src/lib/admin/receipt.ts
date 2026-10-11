@@ -8,6 +8,7 @@ export const TRIGGERS: Record<string, string> = {
   cases_fir_only_on_gr: "Checked that only a G.R. case carries an FIR",
   hearings_not_after_disposal: "Checked the hearing is not after disposal",
   orders_dispose_case: "Final order: disposed of the case",
+  orders_clear_stale_embedding: "Order text changed: cleared its embedding for re-embedding",
   audit_cases: "Audited the case row",
   audit_case_parties: "Audited the party",
   audit_case_advocates: "Audited the advocate link",

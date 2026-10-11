@@ -90,6 +90,19 @@
     map to field messages in `ERRORS` (`src/lib/admin/records.ts`).
   - Deletes are refused while anything refers to the row, with counts;
     archiving is the safe way to take a case off the public register.
+- Order search (`/search?q=`, `src/lib/order-search.ts`): full-text and
+  vector queries run separately and are fused with reciprocal rank fusion
+  (k = 60). Both individual scores are kept and shown; do not collapse them
+  into the fused score alone.
+  - Embeddings come from `EMBEDDING_API_URL`/`EMBEDDING_API_KEY`/
+    `EMBEDDING_MODEL` (1536 dimensions). Queries and orders must use the
+    same model: `orders.embedding_model` records it and the vector query
+    filters on it.
+  - Backfill: `npx tsx db/scripts/embed_orders.ts --limit N` (write login;
+    re-runnable; only rows with a NULL embedding). Editing an order's text
+    clears its embedding (020's trigger); re-run the backfill after edits.
+  - Never paste vectors into the audit log: `audit_orders` omits the
+    embedding and tsvector columns (020).
 
 ## SQL coverage
 
@@ -104,12 +117,15 @@ or script.
 - [x] CREATE TABLE: 001
 - [x] CREATE TYPE: 004 (six enums)
 - [x] ALTER TABLE: 005 (`filed_on`, `stage` made nullable); 019 (`ADD COLUMN`,
-      `DROP CONSTRAINT` of the audit log's FK)
+      `DROP CONSTRAINT` of the audit log's FK); 020 (`GENERATED ALWAYS AS ...
+      STORED` column)
   - also ALTER TYPE: 007 (`disposal_mode` gains `converted`)
 - [x] DROP: 007 (`DROP INDEX case_relationships_from_case_id_idx`); 019
       (`DROP TRIGGER`, to widen `hearings_not_after_disposal` to updates)
 - [x] CREATE INDEX: 001 (including a partial unique index); 019 (partial
-      index on `cases (deleted_at) WHERE deleted_at IS NULL`)
+      index on `cases (deleted_at) WHERE deleted_at IS NULL`); 020 (GIN on a
+      generated `tsvector`, ivfflat on `vector(1536)`)
+- [x] CREATE EXTENSION: 015 (`pgcrypto`); 020 (`vector`)
 - [x] CREATE VIEW: 001 (`usable_limitation_rules`)
 - [x] CREATE FUNCTION: 011 (five PL/pgSQL trigger functions); 019 (generic
       `audit_row()` driven by trigger arguments, and SQL function
@@ -134,6 +150,11 @@ or script.
   - [x] subqueries: 003 (scalar subquery in `UPDATE ... SET`); `NOT EXISTS`
         anti-join in `queries/pending_deadlines.sql`
   - [x] recursive CTE: `queries/case_family.sql`
+  - [x] full-text search: `queries/search_orders_fts.sql`
+        (`websearch_to_tsquery`, `@@`, `ts_rank_cd`), `ts_headline` in
+        `queries/search_orders_details.sql`
+  - [x] vector similarity: `queries/search_orders_vector.sql` (cosine
+        distance `<=>` over pgvector)
   - [x] set operations: `queries/case_stages.sql` (`UNION ALL` of case dates
         and orders, then `DISTINCT ON` per stage; `LATERAL unnest` maps one
         order to several stages)

@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getFilterOptions } from "@/lib/cases";
 import { humanize, statusVariant } from "@/lib/format";
+import { RRF_K, searchOrders, type OrderSearch } from "@/lib/order-search";
 import { findCaseByNumber, searchByNumber, searchByParty, type SearchHit } from "@/lib/search";
+
+import { OrderResults } from "./order-results";
 
 export const metadata: Metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
@@ -31,11 +34,15 @@ export default async function SearchPage({
   const number = one(params.number);
   const year = one(params.year);
   const party = one(params.party).slice(0, 80);
+  const q = one(params.q).slice(0, 200);
 
   // Validate before anything reaches a query.
   const validType = caseTypes.some((t) => t.code === type);
   const validNumber = /^\d{1,9}$/.test(number);
   const validYear = /^\d{4}$/.test(year);
+
+  // Order text: hybrid full-text + semantic search (lib/order-search.ts).
+  const orders: OrderSearch | null = q.length >= 2 ? await searchOrders(q) : null;
 
   let hits: SearchHit[] | null = null;
   let heading = "";
@@ -67,7 +74,7 @@ export default async function SearchPage({
         <p className="font-display text-maroon text-kicker uppercase">Search</p>
         <h1 className="font-serif text-title font-semibold">Find a case</h1>
         <p className="text-muted-foreground mt-2 font-serif text-lg">
-          By the case number on your papers, or by the name of a party.
+          By the case number on your papers, the name of a party, or what an order says.
         </p>
       </div>
 
@@ -91,6 +98,33 @@ export default async function SearchPage({
           </form>
         </section>
       </div>
+
+      <section className="bg-card border-border rounded-md border p-5">
+        <h2 className="font-display mb-1 text-sm tracking-[0.15em] uppercase">In the text of orders</h2>
+        <p className="text-muted-foreground mb-4 text-sm">
+          Searches every order two ways, by its words and by its meaning, and combines the two rankings.
+        </p>
+        <form action="/search" method="get" className="flex flex-col gap-3 sm:flex-row">
+          <Label htmlFor="q" className="sr-only">
+            Words or a description
+          </Label>
+          <Input
+            id="q"
+            name="q"
+            defaultValue={q}
+            minLength={2}
+            maxLength={200}
+            placeholder="e.g. bail granted with sureties, or complainant did not appear"
+            className="h-11 flex-1 text-base"
+            required
+          />
+          <Button type="submit" size="lg" className="h-11">
+            Search orders
+          </Button>
+        </form>
+      </section>
+
+      {orders ? <OrderResults query={q} search={orders} k={RRF_K} /> : null}
 
       {notFound ? (
         <section role="status" className="bg-card border-maroon/40 flex gap-4 rounded-sm border-y border-r border-l-4 p-5">
